@@ -15,16 +15,9 @@ import {
 	validateRunCodeEachItem,
 } from '../../src/resultValidation';
 
-const DEFAULT_JS = `// Code Pro (n8n-nodes-code-pro) — SuperCode-class libraries + stock-compatible modes
-// SuperCode-parity: _, lodash, axios, cheerio, dayjs, moment, dateFns, dateFnsTz,
-//   joi, Joi, validator, uuid, Ajv, yup, xml2js, XMLParser, YAML, papaparse, Papa,
-//   Handlebars, CryptoJS, forge, jwt, bcrypt, bcryptjs, XLSX, QRCode, fuzzy,
-//   stringSimilarity, slug, pluralize, qs, FormData, ini, toml, nanoid, bytes,
-//   phoneNumber, iban, web3, ytdl, ffmpeg, ffmpegStatic, utils, ccxt, coinGecko,
-//   solana, bitcoin, secp256k1, bip39, franc, compromise, pRetry, htmlToText,
-//   marked, jsonDiff, cronParser
-// Code Pro extras: z, zod, luxon, DateTime, jmespath, JSZip, pako, nodeCrypto, ms, XMLBuilder, ExcelJS
-// Modes: $input.all() / items  |  each-item: $json / item / $input.item
+const DEFAULT_JS = `// Code Pro — JavaScript with built-in libraries (see package README for full list)
+// Common globals: _, lodash, axios, cheerio, dayjs, moment, uuid, z, zod, Papa, YAML, ...
+// Modes: $input.all() / items  |  each-item: $json / item  |  inventory: utils.getAvailableLibraries()
 
 const items = $input.all();
 
@@ -46,7 +39,7 @@ export class CodePro implements INodeType {
 		group: ['transform'],
 		version: 1,
 		description:
-			'Run JavaScript with stock Code-compatible modes/helpers and 55+ SuperCode-class libraries built in',
+			'Run JavaScript with stock Code-compatible modes/helpers and 55+ built-in automation libraries',
 		defaults: {
 			name: 'Code Pro',
 		},
@@ -65,7 +58,7 @@ export class CodePro implements INodeType {
 		properties: [
 			{
 				displayName:
-					'<b>Security:</b> Code Pro runs <b>in-process</b> (not the task-runner sandbox) with network-capable libraries (axios, etc.). Use only on <b>trusted self-hosted</b> instances. Heavy libs (web3, ccxt, ffmpeg, …) load when first used.',
+					'<b>Security:</b> Code Pro runs <b>in-process</b> (not the task-runner sandbox) with network-capable libraries (axios, etc.). Use only on <b>trusted self-hosted</b> instances. Heavy libs load when first used.',
 				name: 'securityNotice',
 				type: 'notice',
 				default: '',

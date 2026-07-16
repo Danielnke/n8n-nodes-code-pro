@@ -10,3 +10,9 @@ Thumbs.db
 .idea/
 .vscode/
 *.tsbuildinfo
+
+# Internal docs — keep local only (not public git / not npm)
+# Competitor research, roadmaps, agent rules live here only.
+AGENTS.md
+PROJECT_PLAN.md
+TECH_SPECS.md

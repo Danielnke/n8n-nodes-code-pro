@@ -1,0 +1,28 @@
+# Source (publish compiled dist only; package.json "files" already limits surface)
+src/
+nodes/
+scripts/
+examples/
+tsconfig.json
+package-lock.json
+
+# Internal / private docs (not for public npm consumers)
+AGENTS.md
+PROJECT_PLAN.md
+TECH_SPECS.md
+
+# Dev / VCS / env
+.git/
+.gitignore
+.npmignore
+*.md
+!README.md
+!LICENSE
+.env
+.env.*
+*.log
+*.tgz
+.idea/
+.vscode/
+coverage/
+*.tsbuildinfo

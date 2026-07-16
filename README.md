@@ -29,7 +29,7 @@ Inject name = global in the Code Pro sandbox. Aliases share the same package.
 | `ms` | `ms` | Duration strings (`"5m"`) ↔ milliseconds |
 | `qs` | `qs` | Query-string parse/stringify |
 | `uuid` | `uuid` | UUID v1/v4/v5 (e.g. `uuid.v4()`) |
-| `nanoid` | `nanoid` | Compact unique IDs (`nanoid.nanoid()`) |
+| `nanoid` | `nanoid` | Compact unique IDs (`nanoid()` / `nanoid.nanoid()`) |
 | `utils` | *(built-in)* | `sleep`, `retry`, `flatten`, `getAvailableLibraries`, … |
 
 ### Dates & time
@@ -126,17 +126,9 @@ Inject name = global in the Code Pro sandbox. Aliases share the same package.
 | `ffmpeg` | `fluent-ffmpeg` | FFmpeg control API |
 | `ffmpegStatic` | `ffmpeg-static` | Path to static ffmpeg binary |
 
----
+### Full inject name list
 
-### SuperCode-parity inject names (checklist)
-
-These globals match the SuperCode-style surface (JavaScript focus):
-
-`_`, `lodash`, `axios`, `cheerio`, `dayjs`, `moment`, `dateFns`, `dateFnsTz`, `joi`, `Joi`, `validator`, `uuid`, `Ajv`, `yup`, `xml2js`, `XMLParser`, `YAML`, `papaparse`, `Papa`, `Handlebars`, `CryptoJS`, `forge`, `jwt`, `bcrypt`, `bcryptjs`, `XLSX`, `QRCode`, `fuzzy`, `stringSimilarity`, `slug`, `pluralize`, `qs`, `FormData`, `ini`, `toml`, `nanoid`, `bytes`, `phoneNumber`, `iban`, `web3`, `ytdl`, `ffmpeg`, `ffmpegStatic`, `utils`, `ccxt`, `coinGecko`, `solana`, `bitcoin`, `secp256k1`, `bip39`, `franc`, `compromise`, `pRetry`, `htmlToText`, `marked`, `jsonDiff`, `cronParser`
-
-### Code Pro extras (beyond that checklist)
-
-`z`, `zod`, `luxon`, `DateTime`, `jmespath`, `JSZip`, `pako`, `nodeCrypto`, `ms`, `XMLBuilder`, `ExcelJS`, `xlsx` (alias of `XLSX`)
+`_`, `lodash`, `bytes`, `ms`, `qs`, `uuid`, `nanoid`, `utils`, `dayjs`, `moment`, `dateFns`, `dateFnsTz`, `luxon`, `DateTime`, `cronParser`, `joi`, `Joi`, `yup`, `z`, `zod`, `Ajv`, `validator`, `phoneNumber`, `iban`, `papaparse`, `Papa`, `xml2js`, `XMLParser`, `XMLBuilder`, `YAML`, `ini`, `toml`, `jmespath`, `jsonDiff`, `cheerio`, `htmlToText`, `marked`, `Handlebars`, `slug`, `pluralize`, `fuzzy`, `stringSimilarity`, `franc`, `compromise`, `CryptoJS`, `nodeCrypto`, `forge`, `jwt`, `bcrypt`, `bcryptjs`, `secp256k1`, `bip39`, `axios`, `FormData`, `pRetry`, `XLSX`, `xlsx`, `ExcelJS`, `JSZip`, `pako`, `QRCode`, `web3`, `ccxt`, `coinGecko`, `solana`, `bitcoin`, `ytdl`, `ffmpeg`, `ffmpegStatic`
 
 ---
 
@@ -176,7 +168,7 @@ Restart n8n. Palette: **Code Pro**.
 
 **Return shape:** all-items → `[{ json: { ... } }, ...]`; each-item → single `{ json: { ... } }`. Prefer `pairedItem` when counts differ.
 
-Importable demos (optional): `examples/code-pro-basic.json`, `examples/code-pro-validate-zod.json`.
+Optional workflow imports: `examples/code-pro-basic.json`, `examples/code-pro-validate-zod.json`.
 
 ---
 
@@ -193,18 +185,9 @@ npm install
 npm run build
 npm run lint
 npm run smoke:libs
+npm run test:libs
 npm run dev
 ```
-
----
-
-## Docs
-
-| File | Role |
-|---|---|
-| `AGENTS.md` | Contributor / agent rules |
-| `PROJECT_PLAN.md` | Roadmap |
-| `TECH_SPECS.md` | Technical design |
 
 ## License
 

@@ -1,7 +1,7 @@
 {
   "name": "n8n-nodes-code-pro",
   "version": "0.2.2",
-  "description": "Code Pro — JavaScript Code node for n8n with stock-compatible execution and 55+ SuperCode-class libraries",
+  "description": "Code Pro — JavaScript Code node for n8n with stock-compatible execution and 55+ built-in automation libraries",
   "keywords": [
     "n8n-community-node-package",
     "n8n",
