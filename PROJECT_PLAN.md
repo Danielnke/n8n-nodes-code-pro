@@ -1,6 +1,6 @@
 # Project Plan: n8n-nodes-code-pro (Code Pro)
 
-> **Status:** Phase 1 + Phase 3 libraries **implemented** (v0.2.0) · 2026-07-16  
+> **Status:** Phase 1 + 3 + 4 **implemented** (v0.2.1) · 2026-07-16  
 > **Package:** `n8n-nodes-code-pro`  
 > **Node:** `codePro` / **Code Pro**  
 > **Primary deliverable:** Self-hosted n8n community main-I/O node — stock Code UX parity + **≥ SuperCode’s 55+ JS library surface**, owner-controlled  
@@ -21,9 +21,11 @@ This document is the **roadmap + research archive**. Coding rules: **`AGENTS.md`
 | Directory | `n8n-nodes-code-pro/` (renamed from provisional `n8n-nodes-js-code`) |
 | Docs | AGENTS + PROJECT_PLAN + TECH_SPECS updated for identity + full lib list |
 | Implementation | **Phase 1 + library registry done** |
-| Version | **0.2.0** |
+| Version | **0.2.1** |
 | Build | Green (`npm run build` / `lint` / `smoke:libs`) |
 | Library smoke | **68 injects loaded, 0 failures, 59 packages require OK** |
+| Safety options | Timeout + max output items + pairedItem hints |
+| Examples | `examples/code-pro-*.json` |
 | Implementation readiness research | Done (in TECH_SPECS / this plan) |
 
 ### Version history (docs)
@@ -291,9 +293,12 @@ Modules: `CodePro.node.ts`, `libraryRegistry.ts`, `sandboxContext.ts`, `executeU
 
 ### Phase 4 — Safety & UX
 
-- [ ] Timeout, output caps  
-- [ ] Security README (in-process risk)  
-- [ ] Default code template listing available globals (SuperCode-style comment block + our extras)  
+- [x] Timeout (Options collection)  
+- [x] Max output items cap  
+- [x] Paired-item execution hints  
+- [x] Security notices (node + README)  
+- [x] Default code template listing SuperCode-parity + extras  
+- [x] Example workflows under `examples/`  
 
 ### Phase 5 — Packaging hardening
 

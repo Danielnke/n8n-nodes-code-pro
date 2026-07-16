@@ -1,7 +1,7 @@
 import { createContext, runInContext, type Context } from 'node:vm';
 import type { IExecuteFunctions, INodeExecutionData, IDataObject } from 'n8n-workflow';
 
-import { getLibraryGlobals } from './libraryRegistry';
+import { getAllowedRequirePackages, getLibraryGlobals } from './libraryRegistry';
 
 export type CodeProMode = 'runOnceForAllItems' | 'runOnceForEachItem';
 
@@ -98,61 +98,7 @@ export function buildSandbox(options: RunUserCodeOptions): Context {
 	const libraryGlobals = loadLibraries ? getLibraryGlobals().globals : {};
 
 	// Restricted require for registered package names only (stock Code migrants)
-	const allowedPackages = new Set(
-		loadLibraries
-			? // re-read via registry package list from loaded keys is incomplete; allow by package name map
-				[
-					'lodash',
-					'axios',
-					'cheerio',
-					'dayjs',
-					'moment-timezone',
-					'date-fns',
-					'date-fns-tz',
-					'joi',
-					'validator',
-					'uuid',
-					'ajv',
-					'yup',
-					'zod',
-					'xml2js',
-					'fast-xml-parser',
-					'yaml',
-					'papaparse',
-					'handlebars',
-					'crypto-js',
-					'node-forge',
-					'jsonwebtoken',
-					'bcryptjs',
-					'xlsx',
-					'qrcode',
-					'fuse.js',
-					'string-similarity',
-					'slug',
-					'pluralize',
-					'qs',
-					'form-data',
-					'ini',
-					'toml',
-					'nanoid',
-					'bytes',
-					'libphonenumber-js',
-					'iban',
-					'ms',
-					'luxon',
-					'jmespath',
-					'jszip',
-					'pako',
-					'exceljs',
-					'cron-parser',
-					'json-diff-ts',
-					'html-to-text',
-					'marked',
-					'p-retry',
-					'crypto',
-				]
-			: [],
-	);
+	const allowedPackages = new Set(loadLibraries ? getAllowedRequirePackages() : []);
 
 	const restrictedRequire = (name: string): unknown => {
 		if (!allowedPackages.has(name)) {

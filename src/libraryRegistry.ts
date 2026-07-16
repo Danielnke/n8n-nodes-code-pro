@@ -435,3 +435,11 @@ export function getLibraryGlobals(): LoadLibrariesResult {
 export function clearLibraryCache(): void {
 	cached = undefined;
 }
+
+/** Package names allowed in restricted `require()` inside user code. */
+export function getAllowedRequirePackages(): string[] {
+	const names = new Set(LIBRARY_ENTRIES.map((e) => e.packageName));
+	// Node builtins we intentionally expose
+	names.add('crypto');
+	return [...names];
+}

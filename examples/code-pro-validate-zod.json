@@ -1,0 +1,49 @@
+{
+  "name": "Code Pro — Zod validation",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "When clicking ‘Execute workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  { json: { email: 'ok@example.com', age: 30 } },\n  { json: { email: 'bad', age: 12 } }\n];"
+      },
+      "id": "sample-data",
+      "name": "Sample Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const schema = z.object({\n  email: z.string().email(),\n  age: z.number().int().min(18),\n});\n\nconst result = schema.safeParse($json);\n\nif (!result.success) {\n  return {\n    json: {\n      valid: false,\n      errors: result.error.issues.map((i) => i.message),\n      input: $json,\n    },\n  };\n}\n\nreturn {\n  json: {\n    valid: true,\n    data: result.data,\n  },\n};\n",
+        "options": {
+          "timeout": 30,
+          "maxOutputItems": 10000
+        }
+      },
+      "id": "code-pro",
+      "name": "Code Pro",
+      "type": "n8n-nodes-code-pro.codePro",
+      "typeVersion": 1,
+      "position": [480, 0]
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [[{ "node": "Sample Data", "type": "main", "index": 0 }]]
+    },
+    "Sample Data": {
+      "main": [[{ "node": "Code Pro", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

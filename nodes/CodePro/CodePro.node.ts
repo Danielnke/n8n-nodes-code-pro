@@ -8,6 +8,7 @@ import {
 } from 'n8n-workflow';
 
 import { runUserCode, type CodeProMode } from '../../src/executeUserCode';
+import { enforceMaxOutputItems, maybeAddPairedItemHint } from '../../src/outputGuards';
 import {
 	CodeProValidationError,
 	validateRunCodeAllItems,
@@ -52,10 +53,19 @@ export class CodePro implements INodeType {
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
 		parameterPane: 'wide',
+		hints: [
+			{
+				message:
+					'Code Pro executes in the n8n process with full library access. Prefer stock Code on multi-tenant or untrusted instances.',
+				type: 'warning',
+				location: 'ndv',
+				whenToDisplay: 'beforeExecution',
+			},
+		],
 		properties: [
 			{
 				displayName:
-					'<b>Code Pro</b> runs in the n8n process (not the sandboxed task runner) with a large library surface. Use only on trusted self-hosted instances. Heavy libs (web3, ccxt, ffmpeg, …) load on demand.',
+					'<b>Security:</b> Code Pro runs <b>in-process</b> (not the task-runner sandbox) with network-capable libraries (axios, etc.). Use only on <b>trusted self-hosted</b> instances. Heavy libs (web3, ccxt, ffmpeg, …) load when first used.',
 				name: 'securityNotice',
 				type: 'notice',
 				default: '',
@@ -84,29 +94,49 @@ export class CodePro implements INodeType {
 				name: 'jsCode',
 				type: 'string',
 				typeOptions: {
-					// Prefer stock Code editor; SuperCode uses jsEditor as fallback in some UIs
 					editor: 'codeNodeEditor',
 					editorLanguage: 'javaScript',
 				},
 				default: DEFAULT_JS,
 				description:
-					'JavaScript to execute. Use <code>$input</code>, <code>$json</code>, <code>items</code>, <code>item</code>. Debug with <code>console.log()</code>.',
+					'JavaScript to execute. Use <code>$input</code>, <code>$json</code>, <code>items</code>, <code>item</code>, and library globals. Debug with <code>console.log()</code>.',
 				noDataExpression: true,
 			},
 			{
-				displayName: 'Timeout',
-				name: 'timeout',
-				type: 'number',
-				typeOptions: {
-					minValue: 1,
-					maxValue: 300,
-				},
-				default: 30,
-				description: 'Maximum execution time in seconds (best-effort VM timeout)',
+				displayName: 'Options',
+				name: 'options',
+				type: 'collection',
+				placeholder: 'Add Option',
+				default: {},
+				options: [
+					{
+						displayName: 'Timeout (Seconds)',
+						name: 'timeout',
+						type: 'number',
+						typeOptions: {
+							minValue: 1,
+							maxValue: 300,
+						},
+						default: 30,
+						description: 'Maximum execution time in seconds (best-effort VM timeout)',
+					},
+					{
+						displayName: 'Max Output Items',
+						name: 'maxOutputItems',
+						type: 'number',
+						typeOptions: {
+							minValue: 1,
+							maxValue: 1_000_000,
+						},
+						default: 10_000,
+						description:
+							'Fail if the code returns more items than this (protects memory from runaway maps)',
+					},
+				],
 			},
 			{
 				displayName:
-					'Type <code>$</code> for n8n helpers when the proxy is available. Return items as <code>[{ json: { ... } }]</code> (all-items) or a single <code>{ json: { ... } }</code> (each-item).',
+					'Return <code>[{ json: { ... } }]</code> (all-items) or a single <code>{ json: { ... } }</code> (each-item). Set <code>pairedItem</code> when input/output counts differ. List libs: <code>utils.getAvailableLibraries()</code>.',
 				name: 'notice',
 				type: 'notice',
 				default: '',
@@ -118,15 +148,20 @@ export class CodePro implements INodeType {
 		const items = this.getInputData();
 		const mode = this.getNodeParameter('mode', 0) as CodeProMode;
 		const code = this.getNodeParameter('jsCode', 0) as string;
-		const timeout = this.getNodeParameter('timeout', 0, 30) as number;
+		const options = this.getNodeParameter('options', 0, {}) as {
+			timeout?: number;
+			maxOutputItems?: number;
+		};
+		const timeout = options.timeout ?? 30;
+		const maxOutputItems = options.maxOutputItems ?? 10_000;
 
 		if (!code?.trim()) {
 			throw new NodeOperationError(this.getNode(), 'No JavaScript code provided.');
 		}
 
-		const normalize = ((items: unknown) =>
-			this.helpers.normalizeItems(items as INodeExecutionData | INodeExecutionData[])) as (
-			items: unknown,
+		const normalize = ((raw: unknown) =>
+			this.helpers.normalizeItems(raw as INodeExecutionData | INodeExecutionData[])) as (
+			raw: unknown,
 		) => INodeExecutionData[];
 
 		try {
@@ -146,6 +181,11 @@ export class CodePro implements INodeType {
 
 						const validated = validateRunCodeEachItem(raw, i, normalize);
 						returnData.push(validated);
+
+						// Soft cap during the loop to fail fast
+						if (returnData.length > maxOutputItems) {
+							enforceMaxOutputItems(returnData, maxOutputItems, this);
+						}
 					} catch (error) {
 						if (this.continueOnFail()) {
 							const message = error instanceof Error ? error.message : String(error);
@@ -159,7 +199,9 @@ export class CodePro implements INodeType {
 					}
 				}
 
-				return [returnData];
+				const capped = enforceMaxOutputItems(returnData, maxOutputItems, this);
+				maybeAddPairedItemHint(this, capped, items.length);
+				return [capped];
 			}
 
 			// runOnceForAllItems
@@ -173,7 +215,9 @@ export class CodePro implements INodeType {
 			});
 
 			const validated = validateRunCodeAllItems(raw, normalize);
-			return [validated];
+			const capped = enforceMaxOutputItems(validated, maxOutputItems, this);
+			maybeAddPairedItemHint(this, capped, items.length);
+			return [capped];
 		} catch (error) {
 			if (this.continueOnFail() && mode === 'runOnceForAllItems') {
 				const message = error instanceof Error ? error.message : String(error);

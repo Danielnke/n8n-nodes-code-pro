@@ -64,7 +64,8 @@ If docs conflict with code, **update the docs** (or fix code if wrong).
 | AGENTS / PROJECT_PLAN / TECH_SPECS | Active; library target SuperCode 55+ |
 | TypeScript scaffold | **Done** |
 | Execution engine | **Done** (vm + stock-like validation) |
-| Library registry | **Done** (v0.2.0 — SuperCode-parity + extras; smoke 68 injects / 0 fail) |
+| Library registry | **Done** (SuperCode-parity + extras; smoke 68 injects / 0 fail) |
+| Safety (Phase 4) | **Done** (v0.2.1 — timeout, maxOutputItems, hints) |
 | Git | Initialized on `main` |
 | README / icon | Done |
 | npm publish | Not done |

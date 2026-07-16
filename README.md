@@ -2,7 +2,7 @@
 
 **Code Pro** — a self-hosted n8n community node for running **JavaScript** with stock Code–compatible modes/helpers **and 55+ SuperCode-class libraries** (no `NODE_FUNCTION_ALLOW_EXTERNAL`).
 
-> **v0.2.0:** Executor + SuperCode-parity inject globals + Code Pro extras (`zod`, `luxon`, `jmespath`, …).
+> **v0.2.1:** Executor + SuperCode-parity libraries + safety options (timeout, max output items) + example workflows.
 
 ## Install (self-hosted)
 
@@ -35,7 +35,15 @@ Restart n8n. Search the palette for **Code Pro**.
 |---|---|
 | **Mode** | Run Once for All Items / Run Once for Each Item (same as stock Code) |
 | **JavaScript** | Your script (`jsCode`) |
-| **Timeout** | Seconds (default 30) |
+| **Options → Timeout** | Seconds (default 30) |
+| **Options → Max Output Items** | Fail if more items returned (default 10 000) |
+
+### Example workflows
+
+Import JSON from `examples/`:
+
+- `examples/code-pro-basic.json` — lodash / dayjs / uuid  
+- `examples/code-pro-validate-zod.json` — per-item Zod validation
 
 ### All items
 

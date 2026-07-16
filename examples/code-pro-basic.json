@@ -1,0 +1,52 @@
+{
+  "name": "Code Pro — Basic transform",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "When clicking ‘Execute workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  { json: { name: 'Ada', email: 'ada@example.com' } },\n  { json: { name: 'Grace', email: 'grace@example.com' } }\n];"
+      },
+      "id": "sample-data",
+      "name": "Sample Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Code Pro — lodash + dayjs + uuid\nconst items = $input.all();\n\nreturn items.map((item, index) => ({\n  json: {\n    ...item.json,\n    nameUpper: _.toUpper(String(item.json.name ?? '')),\n    id: uuid.v4(),\n    at: dayjs().toISOString(),\n  },\n  pairedItem: { item: index },\n}));\n",
+        "options": {
+          "timeout": 30,
+          "maxOutputItems": 10000
+        }
+      },
+      "id": "code-pro",
+      "name": "Code Pro",
+      "type": "n8n-nodes-code-pro.codePro",
+      "typeVersion": 1,
+      "position": [480, 0]
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [[{ "node": "Sample Data", "type": "main", "index": 0 }]]
+    },
+    "Sample Data": {
+      "main": [[{ "node": "Code Pro", "type": "main", "index": 0 }]]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
