@@ -1,0 +1,45 @@
+{
+  "name": "n8n-nodes-code-pro",
+  "version": "0.1.0",
+  "description": "Code Pro — JavaScript Code node for n8n with stock-compatible execution and a SuperCode-class library surface (libraries phased in)",
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n",
+    "javascript",
+    "code",
+    "code-pro",
+    "automation",
+    "libraries"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "Danielnke"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "dist/nodes/CodePro/CodePro.node.js",
+  "scripts": {
+    "build": "tsc && node -e \"const fs=require('fs');const path=require('path');const src='nodes/CodePro/codepro.svg';const dest='dist/nodes/CodePro/codepro.svg';fs.mkdirSync(path.dirname(dest),{recursive:true});if(fs.existsSync(src))fs.copyFileSync(src,dest);\"",
+    "dev": "tsc --watch",
+    "lint": "tsc --noEmit"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [],
+    "nodes": [
+      "dist/nodes/CodePro/CodePro.node.js"
+    ]
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "n8n-workflow": "^1.0.0",
+    "typescript": "^5.9.0"
+  }
+}
