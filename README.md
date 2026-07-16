@@ -6,7 +6,7 @@
 |---|---|
 | Package | `n8n-nodes-code-pro` |
 | Node | **Code Pro** (`codePro`) |
-| Version | **0.2.1** |
+| Version | **0.2.2** |
 | Language | JavaScript only |
 | Inject globals | **68** names (aliases included) |
 | npm packages | **~59** runtime libraries + first-party `utils` |

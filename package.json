@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-code-pro",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Code Pro — JavaScript Code node for n8n with stock-compatible execution and 55+ SuperCode-class libraries",
   "keywords": [
     "n8n-community-node-package",
@@ -23,7 +23,8 @@
     "build": "tsc && node -e \"const fs=require('fs');const path=require('path');const src='nodes/CodePro/codepro.svg';const dest='dist/nodes/CodePro/codepro.svg';fs.mkdirSync(path.dirname(dest),{recursive:true});if(fs.existsSync(src))fs.copyFileSync(src,dest);\"",
     "dev": "tsc --watch",
     "lint": "tsc --noEmit",
-    "smoke:libs": "node scripts/smoke-libs.js"
+    "smoke:libs": "node scripts/smoke-libs.js",
+    "test:libs": "node scripts/functional-lib-test.js"
   },
   "files": [
     "dist"

@@ -1,6 +1,6 @@
 # Project Plan: n8n-nodes-code-pro (Code Pro)
 
-> **Status:** Phase 1 + 3 + 4 **implemented** (v0.2.1) · 2026-07-16  
+> **Status:** v0.2.2 — SuperCode JS injects **functionally verified** (57/57); not multi-tenant “sandbox production” · 2026-07-16  
 > **Package:** `n8n-nodes-code-pro`  
 > **Node:** `codePro` / **Code Pro**  
 > **Primary deliverable:** Self-hosted n8n community main-I/O node — stock Code UX parity + **≥ SuperCode’s 55+ JS library surface**, owner-controlled  
@@ -21,11 +21,12 @@ This document is the **roadmap + research archive**. Coding rules: **`AGENTS.md`
 | Directory | `n8n-nodes-code-pro/` (renamed from provisional `n8n-nodes-js-code`) |
 | Docs | AGENTS + PROJECT_PLAN + TECH_SPECS updated for identity + full lib list |
 | Implementation | **Phase 1 + library registry done** |
-| Version | **0.2.1** |
-| Build | Green (`npm run build` / `lint` / `smoke:libs`) |
-| Library smoke | **68 injects loaded, 0 failures, 59 packages require OK** |
+| Version | **0.2.2** |
+| Build | Green |
+| Library functional tests | **`npm run test:libs` → SuperCode 57/57 PASS** |
+| Hardening | Async wall-clock timeout; each-item `$input.all()`; lazy heavies; nanoid/htmlToText/franc shapes |
 | Safety options | Timeout + max output items + pairedItem hints |
-| Examples | `examples/code-pro-*.json` |
+| Production claim | **Trusted self-host beta** — not stock-sandbox multi-tenant |
 | Implementation readiness research | Done (in TECH_SPECS / this plan) |
 
 ### Version history (docs)

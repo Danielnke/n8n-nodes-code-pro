@@ -170,9 +170,19 @@ export class CodePro implements INodeType {
 
 				for (let i = 0; i < items.length; i++) {
 					try {
+						// Cap before continueOnFail can swallow it
+						if (returnData.length >= maxOutputItems) {
+							enforceMaxOutputItems(
+								[...returnData, { json: {} }],
+								maxOutputItems,
+								this,
+							);
+						}
+
 						const raw = await runUserCode({
 							code,
 							items: [items[i]],
+							allItems: items,
 							itemIndex: i,
 							mode,
 							timeoutSec: timeout,
@@ -181,12 +191,14 @@ export class CodePro implements INodeType {
 
 						const validated = validateRunCodeEachItem(raw, i, normalize);
 						returnData.push(validated);
-
-						// Soft cap during the loop to fail fast
-						if (returnData.length > maxOutputItems) {
-							enforceMaxOutputItems(returnData, maxOutputItems, this);
-						}
 					} catch (error) {
+						// Never swallow output-cap failures
+						if (
+							error instanceof NodeOperationError &&
+							error.message.includes('Max Output Items')
+						) {
+							throw error;
+						}
 						if (this.continueOnFail()) {
 							const message = error instanceof Error ? error.message : String(error);
 							returnData.push({
@@ -208,6 +220,7 @@ export class CodePro implements INodeType {
 			const raw = await runUserCode({
 				code,
 				items,
+				allItems: items,
 				itemIndex: 0,
 				mode,
 				timeoutSec: timeout,
