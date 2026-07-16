@@ -65,6 +65,11 @@ const packages = [
 	'@distube/ytdl-core',
 	'fluent-ffmpeg',
 	'ffmpeg-static',
+	'jimp',
+	'image-size',
+	'exifr',
+	'jpeg-js',
+	'pngjs',
 ];
 
 const ok = [];

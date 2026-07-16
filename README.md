@@ -6,10 +6,10 @@
 |---|---|
 | Package | `n8n-nodes-code-pro` |
 | Node | **Code Pro** (`codePro`) |
-| Version | **0.2.2** |
+| Version | **0.2.3** |
 | Language | JavaScript only |
-| Inject globals | **68** names (aliases included) |
-| npm packages | **~59** runtime libraries + first-party `utils` |
+| Inject globals | **70+** names (aliases included; see list below) |
+| npm packages | **60+** runtime libraries + first-party `utils` |
 
 Globals are available **by name in your script** (e.g. `_.map(...)`, `dayjs()`, `z.object(...)`).  
 Runtime inventory: `utils.getAvailableLibraries()`.
@@ -113,7 +113,24 @@ Inject name = global in the Code Pro sandbox. Aliases share the same package.
 | `pako` | `pako` | Deflate/inflate compression |
 | `QRCode` | `qrcode` | Generate QR codes |
 
-### Blockchain / trading / media (heavy; load when used)
+### Image manipulation & metadata
+
+| Global(s) | npm package | What it’s for |
+|---|---|---|
+| `Jimp`, `jimp` | `jimp` | Resize, crop, rotate, composite, encode/decode images (pure JS) |
+| `imageSize` | `image-size` | Fast width/height/type from buffer or file path |
+| `exifr` | `exifr` | EXIF / image metadata parse |
+| `JPEG` | `jpeg-js` | Low-level JPEG encode/decode |
+| `PNG` | `pngjs` | Low-level PNG encode/decode/sync API |
+
+### Video / media processing
+
+| Global(s) | npm package | What it’s for |
+|---|---|---|
+| `ffmpeg` | `fluent-ffmpeg` | Programmatic FFmpeg pipelines (transcode, screenshots, filters) |
+| `ffmpegStatic` | `ffmpeg-static` | Path to bundled `ffmpeg` binary for `ffmpeg.setFfmpegPath(...)` |
+
+### Blockchain / trading (heavy; load when used)
 
 | Global(s) | npm package | What it’s for |
 |---|---|---|
@@ -123,12 +140,10 @@ Inject name = global in the Code Pro sandbox. Aliases share the same package.
 | `solana` | `@solana/web3.js` | Solana web3 |
 | `bitcoin` | `bitcoinjs-lib` | Bitcoin transactions/scripts |
 | `ytdl` | `@distube/ytdl-core` | YouTube stream/info helpers |
-| `ffmpeg` | `fluent-ffmpeg` | FFmpeg control API |
-| `ffmpegStatic` | `ffmpeg-static` | Path to static ffmpeg binary |
 
 ### Full inject name list
 
-`_`, `lodash`, `bytes`, `ms`, `qs`, `uuid`, `nanoid`, `utils`, `dayjs`, `moment`, `dateFns`, `dateFnsTz`, `luxon`, `DateTime`, `cronParser`, `joi`, `Joi`, `yup`, `z`, `zod`, `Ajv`, `validator`, `phoneNumber`, `iban`, `papaparse`, `Papa`, `xml2js`, `XMLParser`, `XMLBuilder`, `YAML`, `ini`, `toml`, `jmespath`, `jsonDiff`, `cheerio`, `htmlToText`, `marked`, `Handlebars`, `slug`, `pluralize`, `fuzzy`, `stringSimilarity`, `franc`, `compromise`, `CryptoJS`, `nodeCrypto`, `forge`, `jwt`, `bcrypt`, `bcryptjs`, `secp256k1`, `bip39`, `axios`, `FormData`, `pRetry`, `XLSX`, `xlsx`, `ExcelJS`, `JSZip`, `pako`, `QRCode`, `web3`, `ccxt`, `coinGecko`, `solana`, `bitcoin`, `ytdl`, `ffmpeg`, `ffmpegStatic`
+`_`, `lodash`, `bytes`, `ms`, `qs`, `uuid`, `nanoid`, `utils`, `dayjs`, `moment`, `dateFns`, `dateFnsTz`, `luxon`, `DateTime`, `cronParser`, `joi`, `Joi`, `yup`, `z`, `zod`, `Ajv`, `validator`, `phoneNumber`, `iban`, `papaparse`, `Papa`, `xml2js`, `XMLParser`, `XMLBuilder`, `YAML`, `ini`, `toml`, `jmespath`, `jsonDiff`, `cheerio`, `htmlToText`, `marked`, `Handlebars`, `slug`, `pluralize`, `fuzzy`, `stringSimilarity`, `franc`, `compromise`, `CryptoJS`, `nodeCrypto`, `forge`, `jwt`, `bcrypt`, `bcryptjs`, `secp256k1`, `bip39`, `axios`, `FormData`, `pRetry`, `XLSX`, `xlsx`, `ExcelJS`, `JSZip`, `pako`, `QRCode`, `Jimp`, `jimp`, `imageSize`, `exifr`, `JPEG`, `PNG`, `ffmpeg`, `ffmpegStatic`, `web3`, `ccxt`, `coinGecko`, `solana`, `bitcoin`, `ytdl`
 
 ---
 

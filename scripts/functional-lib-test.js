@@ -140,6 +140,13 @@ const TESTS = {
 	XMLBuilder: '() => typeof XMLBuilder === "function"',
 	ExcelJS: '() => typeof ExcelJS.Workbook === "function" || typeof ExcelJS === "function"',
 	xlsx: '() => typeof xlsx.utils === "object"',
+	// Image
+	Jimp: '() => typeof Jimp.read === "function" || typeof Jimp === "function"',
+	jimp: '() => typeof jimp.read === "function" || typeof jimp === "function"',
+	imageSize: '() => typeof imageSize === "function"',
+	exifr: '() => typeof exifr.parse === "function" || typeof exifr === "object"',
+	JPEG: '() => typeof JPEG.decode === "function" || typeof JPEG.encode === "function"',
+	PNG: '() => typeof PNG === "function" || typeof PNG.sync === "object"',
 };
 
 async function runOne(name, globals) {

@@ -366,6 +366,56 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 		resolve: (mod) => ({ QRCode: defaultExport(mod) ?? mod }),
 	},
 
+	// --- Image automation (pure JS preferred) ---
+	{
+		injects: ['Jimp', 'jimp'],
+		packageName: 'jimp',
+		lazy: true,
+		optional: true,
+		resolve: (mod) => {
+			const J = defaultExport(mod) ?? mod;
+			return { Jimp: J, jimp: J };
+		},
+	},
+	{
+		injects: ['imageSize'],
+		packageName: 'image-size',
+		lazy: true,
+		optional: true,
+		resolve: (mod) => {
+			// CJS: function imageSize + .types / .default
+			const m = defaultExport(mod) ?? mod;
+			return { imageSize: m };
+		},
+	},
+	{
+		injects: ['exifr'],
+		packageName: 'exifr',
+		lazy: true,
+		optional: true,
+		resolve: (mod) => ({ exifr: defaultExport(mod) ?? mod }),
+	},
+	{
+		injects: ['JPEG'],
+		packageName: 'jpeg-js',
+		lazy: true,
+		optional: true,
+		resolve: (mod) => ({ JPEG: defaultExport(mod) ?? mod }),
+	},
+	{
+		injects: ['PNG'],
+		packageName: 'pngjs',
+		lazy: true,
+		optional: true,
+		resolve: (mod) => {
+			const m = mod as { PNG?: unknown };
+			return { PNG: m.PNG ?? defaultExport(mod) ?? mod };
+		},
+	},
+
+	// --- Video automation (ffmpeg stack already SuperCode-era; keep lazy) ---
+	// fluent-ffmpeg + ffmpeg-static registered below as ffmpeg / ffmpegStatic
+
 	// --- Heavy blockchain / media (always lazy) ---
 	{
 		injects: ['web3'],
