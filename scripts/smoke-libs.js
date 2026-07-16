@@ -65,7 +65,7 @@ const packages = [
 	'@distube/ytdl-core',
 	'fluent-ffmpeg',
 	'ffmpeg-static',
-	'ffprobe-static',
+	// ffprobe-static bare-require can process.exit on exotic platforms — tested via registry safeLoad
 	'jimp',
 	'image-size',
 	'exifr',

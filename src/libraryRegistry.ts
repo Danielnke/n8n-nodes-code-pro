@@ -1,6 +1,6 @@
 /**
  * Canonical library inject map for Code Pro.
- * SuperCode-parity names + Code Pro extras (image/video automation).
+ * Built-in automation injects + image/video tooling.
  *
  * Default is lazy load — first Code Pro run must not require() heavy trees
  * (web3/ccxt/ffmpeg/jimp/…) unless user code touches those globals.
@@ -98,7 +98,6 @@ export function safeLoadFfmpegPath(): string | null {
 }
 
 /**
- * SuperCode-parity + extras.
  * Only default-template core is eager; everything else is lazy.
  */
 export const LIBRARY_ENTRIES: LibraryEntry[] = [
@@ -256,7 +255,7 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 		resolve: (mod) => ({ Handlebars: defaultExport(mod) }),
 	},
 	{
-		// SuperCode expects callable htmlToText(html), not { convert }
+		// Callable htmlToText(html), not { convert }
 		injects: ['htmlToText'],
 		packageName: 'html-to-text',
 		lazy: true,
@@ -784,7 +783,7 @@ export function clearLibraryCache(): void {
 	cached = undefined;
 }
 
-/** Package names + common SuperCode/require aliases for restricted require(). */
+/** Package names + common require aliases for restricted require(). */
 export function getAllowedRequirePackages(): string[] {
 	const names = new Set(LIBRARY_ENTRIES.map((e) => e.packageName));
 	names.add('crypto');

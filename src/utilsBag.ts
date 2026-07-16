@@ -1,5 +1,5 @@
 /**
- * First-party `utils` global (SuperCode-compatible surface + Code Pro helpers).
+ * First-party `utils` global for Code Pro (sleep, retry, inventory helpers).
  */
 
 export interface RetryOptions {

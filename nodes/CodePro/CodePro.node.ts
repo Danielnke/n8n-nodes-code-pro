@@ -8,7 +8,11 @@ import {
 } from 'n8n-workflow';
 
 import { runUserCode, type CodeProMode } from '../../src/executeUserCode';
-import { enforceMaxOutputItems, maybeAddPairedItemHint } from '../../src/outputGuards';
+import {
+	enforceMaxOutputItems,
+	isMaxOutputItemsError,
+	maybeAddPairedItemHint,
+} from '../../src/outputGuards';
 import {
 	CodeProValidationError,
 	validateRunCodeAllItems,
@@ -187,10 +191,7 @@ export class CodePro implements INodeType {
 						returnData.push(validated);
 					} catch (error) {
 						// Never swallow output-cap failures
-						if (
-							error instanceof NodeOperationError &&
-							error.message.includes('Max Output Items')
-						) {
+						if (isMaxOutputItemsError(error)) {
 							throw error;
 						}
 						if (this.continueOnFail()) {
@@ -227,10 +228,7 @@ export class CodePro implements INodeType {
 			return [capped];
 		} catch (error) {
 			// Never swallow memory/output-cap failures under continueOnFail
-			if (
-				error instanceof NodeOperationError &&
-				error.message.includes('Max Output Items')
-			) {
+			if (isMaxOutputItemsError(error)) {
 				throw error;
 			}
 			if (this.continueOnFail() && mode === 'runOnceForAllItems') {
