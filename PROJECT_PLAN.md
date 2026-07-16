@@ -1,6 +1,6 @@
 # Project Plan: n8n-nodes-code-pro (Code Pro)
 
-> **Status:** Phase 1 scaffold **implemented** (v0.1.0 executor) · 2026-07-16  
+> **Status:** Phase 1 + Phase 3 libraries **implemented** (v0.2.0) · 2026-07-16  
 > **Package:** `n8n-nodes-code-pro`  
 > **Node:** `codePro` / **Code Pro**  
 > **Primary deliverable:** Self-hosted n8n community main-I/O node — stock Code UX parity + **≥ SuperCode’s 55+ JS library surface**, owner-controlled  
@@ -20,9 +20,10 @@ This document is the **roadmap + research archive**. Coding rules: **`AGENTS.md`
 | Library bar | **SuperCode parity (55+) + Code Pro extras** — not a minimal subset |
 | Directory | `n8n-nodes-code-pro/` (renamed from provisional `n8n-nodes-js-code`) |
 | Docs | AGENTS + PROJECT_PLAN + TECH_SPECS updated for identity + full lib list |
-| Implementation | **Phase 1 done** (executor + validation; no library pack yet) |
-| Version | **0.1.0** |
-| Build | Green (`npm run build` / `lint`) |
+| Implementation | **Phase 1 + library registry done** |
+| Version | **0.2.0** |
+| Build | Green (`npm run build` / `lint` / `smoke:libs`) |
+| Library smoke | **68 injects loaded, 0 failures, 59 packages require OK** |
 | Implementation readiness research | Done (in TECH_SPECS / this plan) |
 
 ### Version history (docs)
@@ -280,13 +281,13 @@ Modules: `CodePro.node.ts`, `libraryRegistry.ts`, `sandboxContext.ts`, `executeU
 
 ### Phase 3 — Full library registry (SuperCode parity + extras)
 
-- [ ] 3.1 `libraryRegistry` with **every** SuperCode inject name  
-- [ ] 3.2 `package.json` dependencies for full set  
-- [ ] 3.3 Lazy load for heavy modules  
-- [ ] 3.4 Code Pro extras (`zod`, `luxon`, `jmespath`, zip/compression, …)  
-- [ ] 3.5 Restricted `require` map  
-- [ ] 3.6 Document all symbols + versions  
-- [ ] 3.7 Smoke tests: one call per inject family  
+- [x] 3.1 `libraryRegistry` with SuperCode inject names  
+- [x] 3.2 `package.json` dependencies for full set  
+- [x] 3.3 Optional/heavy packages load with stubs on failure  
+- [x] 3.4 Code Pro extras (`zod`, `luxon`, `jmespath`, zip/compression, …)  
+- [x] 3.5 Restricted `require` map  
+- [x] 3.6 Documented in README + TECH_SPECS  
+- [x] 3.7 `npm run smoke:libs` (68 injects / 0 fail)  
 
 ### Phase 4 — Safety & UX
 

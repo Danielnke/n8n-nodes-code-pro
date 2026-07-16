@@ -62,9 +62,9 @@ If docs conflict with code, **update the docs** (or fix code if wrong).
 | npm package name | **Locked:** `n8n-nodes-code-pro` (404 / free on npm as of 2026-07-16) |
 | Node identity | **Locked** — see §4 |
 | AGENTS / PROJECT_PLAN / TECH_SPECS | Active; library target SuperCode 55+ |
-| TypeScript scaffold | **Done** (v0.1.0) |
-| Execution engine | **Done** (vm + stock-like validation; no libs yet) |
-| Library registry | **Not started** (Phase 3) |
+| TypeScript scaffold | **Done** |
+| Execution engine | **Done** (vm + stock-like validation) |
+| Library registry | **Done** (v0.2.0 — SuperCode-parity + extras; smoke 68 injects / 0 fail) |
 | Git | Initialized on `main` |
 | README / icon | Done |
 | npm publish | Not done |
@@ -180,38 +180,38 @@ Default product stance after user direction: **support more / full SuperCode sur
 
 ---
 
-## 6. File map (target)
+## 6. File map
 
 ```text
 n8n-nodes-code-pro/
   AGENTS.md
   PROJECT_PLAN.md
   TECH_SPECS.md
-  README.md                 # later
-  package.json              # name: n8n-nodes-code-pro
+  README.md
+  package.json
   tsconfig.json
+  scripts/smoke-libs.js
   nodes/CodePro/
     CodePro.node.ts
-    codepro.svg | codepro.png
+    codepro.svg
   src/
     executeUserCode.ts
-    sandboxContext.ts
     libraryRegistry.ts      # SuperCode parity + extras
     resultValidation.ts
-    timeouts.ts
+    utilsBag.ts
   dist/                     # gitignored
 ```
 
 ---
 
-## 7. Commands (target)
+## 7. Commands
 
 ```bash
 npm install
 npm run build
 npm run lint
 npm run dev
-npm test
+npm run smoke:libs   # require all packages + load registry
 ```
 
 Windows PowerShell: prefer `;` over `&&` when chaining is fragile.

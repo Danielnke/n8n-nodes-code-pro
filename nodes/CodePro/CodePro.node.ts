@@ -14,17 +14,24 @@ import {
 	validateRunCodeEachItem,
 } from '../../src/resultValidation';
 
-const DEFAULT_JS = `// Code Pro (n8n-nodes-code-pro)
-// Modes: Run Once for All Items → $input.all() / items
-//        Run Once for Each Item → $json / item / $input.item
-// Libraries (SuperCode-class surface) land in a later version — executor is Phase 1.
+const DEFAULT_JS = `// Code Pro (n8n-nodes-code-pro) — SuperCode-class libraries + stock-compatible modes
+// SuperCode-parity: _, lodash, axios, cheerio, dayjs, moment, dateFns, dateFnsTz,
+//   joi, Joi, validator, uuid, Ajv, yup, xml2js, XMLParser, YAML, papaparse, Papa,
+//   Handlebars, CryptoJS, forge, jwt, bcrypt, bcryptjs, XLSX, QRCode, fuzzy,
+//   stringSimilarity, slug, pluralize, qs, FormData, ini, toml, nanoid, bytes,
+//   phoneNumber, iban, web3, ytdl, ffmpeg, ffmpegStatic, utils, ccxt, coinGecko,
+//   solana, bitcoin, secp256k1, bip39, franc, compromise, pRetry, htmlToText,
+//   marked, jsonDiff, cronParser
+// Code Pro extras: z, zod, luxon, DateTime, jmespath, JSZip, pako, nodeCrypto, ms, XMLBuilder, ExcelJS
+// Modes: $input.all() / items  |  each-item: $json / item / $input.item
 
 const items = $input.all();
 
 return items.map((item, index) => ({
   json: {
     ...item.json,
-    codePro: true,
+    id: uuid.v4(),
+    at: dayjs().toISOString(),
   },
   pairedItem: { item: index },
 }));
@@ -38,7 +45,7 @@ export class CodePro implements INodeType {
 		group: ['transform'],
 		version: 1,
 		description:
-			'Run JavaScript with stock Code-compatible modes and helpers. SuperCode-class libraries coming in a follow-up release.',
+			'Run JavaScript with stock Code-compatible modes/helpers and 55+ SuperCode-class libraries built in',
 		defaults: {
 			name: 'Code Pro',
 		},
@@ -48,7 +55,7 @@ export class CodePro implements INodeType {
 		properties: [
 			{
 				displayName:
-					'<b>Code Pro</b> runs in the n8n process (not the sandboxed task runner). Treat it as a trusted power-user node on self-hosted instances. Library catalog ships in a later version.',
+					'<b>Code Pro</b> runs in the n8n process (not the sandboxed task runner) with a large library surface. Use only on trusted self-hosted instances. Heavy libs (web3, ccxt, ffmpeg, …) load on demand.',
 				name: 'securityNotice',
 				type: 'notice',
 				default: '',

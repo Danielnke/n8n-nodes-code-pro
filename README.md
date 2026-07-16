@@ -1,9 +1,8 @@
 # n8n-nodes-code-pro
 
-**Code Pro** — a self-hosted n8n community node for running **JavaScript** with stock Code–compatible modes and helpers.
+**Code Pro** — a self-hosted n8n community node for running **JavaScript** with stock Code–compatible modes/helpers **and 55+ SuperCode-class libraries** (no `NODE_FUNCTION_ALLOW_EXTERNAL`).
 
-> **v0.1.0 (Phase 1):** Executor + validation + stock-like `$input` / modes.  
-> **SuperCode-class library catalog (55+ globals)** ships in a follow-up release — see `TECH_SPECS.md`.
+> **v0.2.0:** Executor + SuperCode-parity inject globals + Code Pro extras (`zod`, `luxon`, `jmespath`, …).
 
 ## Install (self-hosted)
 
@@ -58,6 +57,26 @@ return {
   },
 };
 ```
+
+### Libraries (examples)
+
+```js
+// lodash + dayjs + zod
+const rows = _.map($input.all(), (i) => i.json);
+const parsed = z.object({ email: z.string().email() }).safeParse(rows[0]);
+return [{ json: { ok: parsed.success, at: dayjs().toISOString() } }];
+```
+
+```js
+// cheerio + axios
+const { data } = await axios.get('https://example.com');
+const $ = cheerio.load(data);
+return [{ json: { title: $('title').text() } }];
+```
+
+List loaded names at runtime: `utils.getAvailableLibraries()`.
+
+Full matrix: `TECH_SPECS.md`.
 
 ## Security
 

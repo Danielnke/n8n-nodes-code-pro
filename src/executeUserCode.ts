@@ -1,6 +1,8 @@
 import { createContext, runInContext, type Context } from 'node:vm';
 import type { IExecuteFunctions, INodeExecutionData, IDataObject } from 'n8n-workflow';
 
+import { getLibraryGlobals } from './libraryRegistry';
+
 export type CodeProMode = 'runOnceForAllItems' | 'runOnceForEachItem';
 
 export interface RunUserCodeOptions {
@@ -10,8 +12,10 @@ export interface RunUserCodeOptions {
 	mode: CodeProMode;
 	timeoutSec: number;
 	ctx: IExecuteFunctions;
-	/** Extra globals (libraries in later phases). */
+	/** Extra globals (merged after library registry). */
 	extraGlobals?: Record<string, unknown>;
+	/** When false, skip loading npm library registry (tests). Default true. */
+	loadLibraries?: boolean;
 }
 
 function buildInputHelpers(items: INodeExecutionData[], mode: CodeProMode, itemIndex: number) {
@@ -78,7 +82,7 @@ function createConsole(ctx: IExecuteFunctions) {
  * Build the VM context: stock-like helpers from getWorkflowDataProxy + mode overlays.
  */
 export function buildSandbox(options: RunUserCodeOptions): Context {
-	const { items, itemIndex, mode, ctx, extraGlobals = {} } = options;
+	const { items, itemIndex, mode, ctx, extraGlobals = {}, loadLibraries = true } = options;
 
 	let dataProxy: Record<string, unknown> = {};
 	try {
@@ -91,6 +95,75 @@ export function buildSandbox(options: RunUserCodeOptions): Context {
 	const $input = buildInputHelpers(items, mode, itemIndex);
 	const currentItem = mode === 'runOnceForEachItem' ? items[0] : undefined;
 
+	const libraryGlobals = loadLibraries ? getLibraryGlobals().globals : {};
+
+	// Restricted require for registered package names only (stock Code migrants)
+	const allowedPackages = new Set(
+		loadLibraries
+			? // re-read via registry package list from loaded keys is incomplete; allow by package name map
+				[
+					'lodash',
+					'axios',
+					'cheerio',
+					'dayjs',
+					'moment-timezone',
+					'date-fns',
+					'date-fns-tz',
+					'joi',
+					'validator',
+					'uuid',
+					'ajv',
+					'yup',
+					'zod',
+					'xml2js',
+					'fast-xml-parser',
+					'yaml',
+					'papaparse',
+					'handlebars',
+					'crypto-js',
+					'node-forge',
+					'jsonwebtoken',
+					'bcryptjs',
+					'xlsx',
+					'qrcode',
+					'fuse.js',
+					'string-similarity',
+					'slug',
+					'pluralize',
+					'qs',
+					'form-data',
+					'ini',
+					'toml',
+					'nanoid',
+					'bytes',
+					'libphonenumber-js',
+					'iban',
+					'ms',
+					'luxon',
+					'jmespath',
+					'jszip',
+					'pako',
+					'exceljs',
+					'cron-parser',
+					'json-diff-ts',
+					'html-to-text',
+					'marked',
+					'p-retry',
+					'crypto',
+				]
+			: [],
+	);
+
+	const restrictedRequire = (name: string): unknown => {
+		if (!allowedPackages.has(name)) {
+			throw new Error(
+				`require('${name}') is not allowed in Code Pro. Use injected globals (e.g. lodash as _ / lodash) or add the package to the Code Pro registry.`,
+			);
+		}
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
+		return require(name);
+	};
+
 	const sandbox: Record<string, unknown> = {
 		...dataProxy,
 		// Mode aliases (stock Code)
@@ -99,7 +172,10 @@ export function buildSandbox(options: RunUserCodeOptions): Context {
 		$itemIndex: itemIndex,
 		// Prefer our $input overlay for predictable all/each semantics
 		$input,
-		$json: mode === 'runOnceForEachItem' ? currentItem?.json : (dataProxy.$json as IDataObject | undefined),
+		$json:
+			mode === 'runOnceForEachItem'
+				? currentItem?.json
+				: (dataProxy.$json as IDataObject | undefined),
 		$binary: mode === 'runOnceForEachItem' ? currentItem?.binary : dataProxy.$binary,
 		// n8n helpers when available
 		helpers: ctx.helpers,
@@ -116,8 +192,11 @@ export function buildSandbox(options: RunUserCodeOptions): Context {
 		clearImmediate,
 		URL,
 		URLSearchParams,
-		// Phase 3+: library globals
+		// SuperCode-parity + extras
+		...libraryGlobals,
+		// Optional overrides last
 		...extraGlobals,
+		require: restrictedRequire,
 	};
 
 	return createContext(sandbox);
