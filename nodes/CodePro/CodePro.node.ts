@@ -39,7 +39,7 @@ export class CodePro implements INodeType {
 		group: ['transform'],
 		version: 1,
 		description:
-			'Run JavaScript with stock Code-compatible modes/helpers and 55+ built-in automation libraries',
+			'Run JavaScript with stock Code-compatible modes/helpers and 70+ built-in automation libraries (data, image, video tooling)',
 		defaults: {
 			name: 'Code Pro',
 		},
@@ -111,7 +111,8 @@ export class CodePro implements INodeType {
 							maxValue: 300,
 						},
 						default: 30,
-						description: 'Maximum execution time in seconds (best-effort VM timeout)',
+						description:
+							'Soft timeout in seconds (sync VM + Promise.race). Does not hard-kill async HTTP/ffmpeg; increase for long media jobs',
 					},
 					{
 						displayName: 'Max Output Items',
@@ -129,7 +130,7 @@ export class CodePro implements INodeType {
 			},
 			{
 				displayName:
-					'Return <code>[{ json: { ... } }]</code> (all-items) or a single <code>{ json: { ... } }</code> (each-item). Set <code>pairedItem</code> when input/output counts differ. List libs: <code>utils.getAvailableLibraries()</code>.',
+					'Return <code>[{ json: { ... } }]</code> (all-items) or a single <code>{ json: { ... } }</code> (each-item). Set <code>pairedItem</code> when input/output counts differ. Inventory: <code>utils.getAvailableLibraries()</code> / <code>utils.getRegisteredLibraries()</code>. Image: <code>Jimp</code>, <code>imageSize</code>, <code>exifr</code>. Video: <code>ffmpeg</code> + static binaries.',
 				name: 'notice',
 				type: 'notice',
 				default: '',
@@ -225,6 +226,13 @@ export class CodePro implements INodeType {
 			maybeAddPairedItemHint(this, capped, items.length);
 			return [capped];
 		} catch (error) {
+			// Never swallow memory/output-cap failures under continueOnFail
+			if (
+				error instanceof NodeOperationError &&
+				error.message.includes('Max Output Items')
+			) {
+				throw error;
+			}
 			if (this.continueOnFail() && mode === 'runOnceForAllItems') {
 				const message = error instanceof Error ? error.message : String(error);
 				return [[{ json: { error: message }, pairedItem: { item: 0 } }]];

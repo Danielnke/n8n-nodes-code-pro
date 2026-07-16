@@ -65,6 +65,7 @@ const packages = [
 	'@distube/ytdl-core',
 	'fluent-ffmpeg',
 	'ffmpeg-static',
+	'ffprobe-static',
 	'jimp',
 	'image-size',
 	'exifr',

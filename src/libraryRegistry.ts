@@ -1,10 +1,16 @@
 /**
  * Canonical library inject map for Code Pro.
- * SuperCode-parity names + Code Pro extras.
+ * SuperCode-parity names + Code Pro extras (image/video automation).
  *
- * Heavy/optional packages use lazy getters so first Code Pro run does not
- * require() web3/ccxt/ffmpeg unless the user actually touches those globals.
+ * Default is lazy load — first Code Pro run must not require() heavy trees
+ * (web3/ccxt/ffmpeg/jimp/…) unless user code touches those globals.
+ *
+ * CRITICAL: never bare-require packages that call process.exit on bad platforms
+ * (e.g. ffprobe-static). Always platform-precheck + existsSync.
  */
+
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 
 import { createUtilsBag } from './utilsBag';
 
@@ -14,13 +20,29 @@ export interface LibraryEntry {
 	/** npm package name */
 	packageName: string;
 	/**
-	 * Lazy-load on first access (default true for optional; set false to eager-load core).
+	 * Lazy-load on first access.
+	 * Default true. Set false only for tiny always-used core (default template).
 	 */
 	lazy?: boolean;
 	/** Prefer stub over throw when package missing (still tries load). */
 	optional?: boolean;
 	/** Map required module → injected value(s). Default: module itself for each inject. */
 	resolve?: (mod: unknown) => Record<string, unknown>;
+}
+
+/** Marker on missing-library stubs (do not count as "available"). */
+export const CODE_PRO_MISSING = Symbol.for('n8n-nodes-code-pro.missingLibrary');
+
+export function isMissingLibrary(value: unknown): boolean {
+	if (value == null) return true;
+	if (typeof value === 'function' || typeof value === 'object') {
+		try {
+			return Boolean((value as Record<symbol, unknown>)[CODE_PRO_MISSING]);
+		} catch {
+			return false;
+		}
+	}
+	return false;
 }
 
 function req(packageName: string): unknown {
@@ -37,11 +59,50 @@ function defaultExport(mod: unknown): unknown {
 }
 
 /**
+ * ffprobe-static calls process.exit(1) on unsupported platform/arch at require time.
+ * Never require it without this precheck.
+ */
+export function safeLoadFfprobePath(): string | null {
+	const platform = os.platform();
+	const arch = os.arch();
+	if (platform !== 'darwin' && platform !== 'linux' && platform !== 'win32') {
+		return null;
+	}
+	if (platform === 'darwin' && arch !== 'x64' && arch !== 'arm64') {
+		return null;
+	}
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
+		const probe = require('ffprobe-static') as { path?: string };
+		const p = probe?.path;
+		if (typeof p === 'string' && fs.existsSync(p)) {
+			return p;
+		}
+	} catch {
+		/* optional binary package */
+	}
+	return null;
+}
+
+export function safeLoadFfmpegPath(): string | null {
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
+		const ffPath = require('ffmpeg-static') as string | null;
+		if (typeof ffPath === 'string' && fs.existsSync(ffPath)) {
+			return ffPath;
+		}
+	} catch {
+		/* optional binary package */
+	}
+	return null;
+}
+
+/**
  * SuperCode-parity + extras.
- * Core automation libs: eager. Heavy blockchain/media: lazy.
+ * Only default-template core is eager; everything else is lazy.
  */
 export const LIBRARY_ENTRIES: LibraryEntry[] = [
-	// --- Data / utils (eager) ---
+	// --- Default template core (eager, tiny) ---
 	{
 		injects: ['_', 'lodash'],
 		packageName: 'lodash',
@@ -70,8 +131,6 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 			if (typeof m === 'function') {
 				return { nanoid: m };
 			}
-			// CJS export { nanoid, customAlphabet, ... } — inject whole module
-			// Also support calling nanoid() if only .nanoid exists
 			const fn = m.nanoid;
 			if (typeof fn === 'function') {
 				const callable = Object.assign(fn.bind(m), m);
@@ -80,31 +139,31 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 			return { nanoid: m };
 		},
 	},
-
-	// --- Dates ---
 	{ injects: ['dayjs'], packageName: 'dayjs', lazy: false },
+
+	// --- Dates (lazy) ---
 	{
 		injects: ['moment'],
 		packageName: 'moment-timezone',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => ({ moment: defaultExport(mod) }),
 	},
 	{
 		injects: ['dateFns'],
 		packageName: 'date-fns',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => ({ dateFns: mod }),
 	},
 	{
 		injects: ['dateFnsTz'],
 		packageName: 'date-fns-tz',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => ({ dateFnsTz: mod }),
 	},
 	{
 		injects: ['luxon', 'DateTime'],
 		packageName: 'luxon',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => {
 			const m = mod as { DateTime: unknown };
 			return { luxon: m, DateTime: m.DateTime };
@@ -113,7 +172,7 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 	{
 		injects: ['cronParser'],
 		packageName: 'cron-parser',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => ({ cronParser: defaultExport(mod) ?? mod }),
 	},
 
@@ -121,24 +180,24 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 	{
 		injects: ['joi', 'Joi'],
 		packageName: 'joi',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => {
 			const j = defaultExport(mod);
 			return { joi: j, Joi: j };
 		},
 	},
-	{ injects: ['validator'], packageName: 'validator', lazy: false },
+	{ injects: ['validator'], packageName: 'validator', lazy: true },
 	{
 		injects: ['Ajv'],
 		packageName: 'ajv',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => ({ Ajv: defaultExport(mod) }),
 	},
-	{ injects: ['yup'], packageName: 'yup', lazy: false, optional: true },
+	{ injects: ['yup'], packageName: 'yup', lazy: true, optional: true },
 	{
 		injects: ['z', 'zod'],
 		packageName: 'zod',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => {
 			const z = defaultExport(mod);
 			return { z, zod: z };
@@ -147,17 +206,17 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 	{
 		injects: ['phoneNumber'],
 		packageName: 'libphonenumber-js',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => ({ phoneNumber: mod }),
 	},
-	{ injects: ['iban'], packageName: 'iban', lazy: false },
+	{ injects: ['iban'], packageName: 'iban', lazy: true },
 
 	// --- Parse / formats ---
-	{ injects: ['xml2js'], packageName: 'xml2js', lazy: false },
+	{ injects: ['xml2js'], packageName: 'xml2js', lazy: true },
 	{
 		injects: ['XMLParser', 'XMLBuilder'],
 		packageName: 'fast-xml-parser',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => {
 			const m = mod as { XMLParser: unknown; XMLBuilder: unknown };
 			return { XMLParser: m.XMLParser, XMLBuilder: m.XMLBuilder };
@@ -166,41 +225,41 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 	{
 		injects: ['YAML'],
 		packageName: 'yaml',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => ({ YAML: mod }),
 	},
 	{
 		injects: ['papaparse', 'Papa'],
 		packageName: 'papaparse',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => {
 			const p = defaultExport(mod);
 			return { papaparse: p, Papa: p };
 		},
 	},
-	{ injects: ['ini'], packageName: 'ini', lazy: false },
-	{ injects: ['toml'], packageName: 'toml', lazy: false },
-	{ injects: ['jmespath'], packageName: 'jmespath', lazy: false },
+	{ injects: ['ini'], packageName: 'ini', lazy: true },
+	{ injects: ['toml'], packageName: 'toml', lazy: true },
+	{ injects: ['jmespath'], packageName: 'jmespath', lazy: true },
 	{
 		injects: ['jsonDiff'],
 		packageName: 'json-diff-ts',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => ({ jsonDiff: mod }),
 	},
 
 	// --- HTML / text ---
-	{ injects: ['cheerio'], packageName: 'cheerio', lazy: false, optional: true },
+	{ injects: ['cheerio'], packageName: 'cheerio', lazy: true, optional: true },
 	{
 		injects: ['Handlebars'],
 		packageName: 'handlebars',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => ({ Handlebars: defaultExport(mod) }),
 	},
 	{
 		// SuperCode expects callable htmlToText(html), not { convert }
 		injects: ['htmlToText'],
 		packageName: 'html-to-text',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => {
 			const m = mod as { htmlToText?: unknown; convert?: unknown };
 			const fn = m.htmlToText ?? m.convert ?? defaultExport(mod) ?? mod;
@@ -210,37 +269,37 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 	{
 		injects: ['marked'],
 		packageName: 'marked',
-		lazy: false,
+		lazy: true,
 		optional: true,
 		resolve: (mod) => ({ marked: defaultExport(mod) ?? mod }),
 	},
 	{
 		injects: ['slug'],
 		packageName: 'slug',
-		lazy: false,
+		lazy: true,
 		optional: true,
 		resolve: (mod) => ({ slug: defaultExport(mod) }),
 	},
-	{ injects: ['pluralize'], packageName: 'pluralize', lazy: false },
+	{ injects: ['pluralize'], packageName: 'pluralize', lazy: true },
 	{
 		injects: ['fuzzy'],
 		packageName: 'fuse.js',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => ({ fuzzy: defaultExport(mod) }),
 	},
 	{
 		injects: ['stringSimilarity'],
 		packageName: 'string-similarity',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => ({ stringSimilarity: defaultExport(mod) ?? mod }),
 	},
 	{
+		// franc-min is ESM; Node 20.19+/22 can require() it. optional if host cannot.
 		injects: ['franc'],
 		packageName: 'franc-min',
-		lazy: false,
+		lazy: true,
 		optional: true,
 		resolve: (mod) => {
-			// ESM namespace: { franc, francAll } — not a default function export
 			const m = mod as { franc?: unknown; default?: unknown };
 			const fn = m.franc ?? defaultExport(mod) ?? mod;
 			return { franc: fn };
@@ -249,7 +308,7 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 	{
 		injects: ['compromise'],
 		packageName: 'compromise',
-		lazy: false,
+		lazy: true,
 		optional: true,
 		resolve: (mod) => ({ compromise: defaultExport(mod) }),
 	},
@@ -258,7 +317,7 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 	{
 		injects: ['CryptoJS'],
 		packageName: 'crypto-js',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => ({ CryptoJS: defaultExport(mod) }),
 	},
 	{
@@ -271,13 +330,13 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 	{
 		injects: ['jwt'],
 		packageName: 'jsonwebtoken',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => ({ jwt: defaultExport(mod) ?? mod }),
 	},
 	{
 		injects: ['bcrypt', 'bcryptjs'],
 		packageName: 'bcryptjs',
-		lazy: false,
+		lazy: true,
 		optional: true,
 		resolve: (mod) => {
 			const b = defaultExport(mod);
@@ -287,7 +346,7 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 	{
 		injects: ['nodeCrypto'],
 		packageName: 'crypto',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => ({ nodeCrypto: mod }),
 	},
 	{
@@ -309,19 +368,19 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 	{
 		injects: ['axios'],
 		packageName: 'axios',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => ({ axios: defaultExport(mod) }),
 	},
 	{
 		injects: ['FormData'],
 		packageName: 'form-data',
-		lazy: false,
+		lazy: true,
 		resolve: (mod) => ({ FormData: defaultExport(mod) }),
 	},
 	{
 		injects: ['pRetry'],
 		packageName: 'p-retry',
-		lazy: false,
+		lazy: true,
 		optional: true,
 		resolve: (mod) => ({ pRetry: defaultExport(mod) }),
 	},
@@ -366,7 +425,7 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 		resolve: (mod) => ({ QRCode: defaultExport(mod) ?? mod }),
 	},
 
-	// --- Image automation (pure JS preferred) ---
+	// --- Image automation (pure JS preferred; lazy) ---
 	{
 		injects: ['Jimp', 'jimp'],
 		packageName: 'jimp',
@@ -383,7 +442,6 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 		lazy: true,
 		optional: true,
 		resolve: (mod) => {
-			// CJS: function imageSize + .types / .default
 			const m = defaultExport(mod) ?? mod;
 			return { imageSize: m };
 		},
@@ -413,10 +471,7 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 		},
 	},
 
-	// --- Video automation (ffmpeg stack already SuperCode-era; keep lazy) ---
-	// fluent-ffmpeg + ffmpeg-static registered below as ffmpeg / ffmpegStatic
-
-	// --- Heavy blockchain / media (always lazy) ---
+	// --- Video automation (lazy; binary-safe path wiring) ---
 	{
 		injects: ['web3'],
 		packageName: 'web3',
@@ -469,25 +524,14 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 				setFfmpegPath?: (p: string) => void;
 				setFfprobePath?: (p: string) => void;
 			};
-			// Auto-wire static binaries when present (video automation otherwise fails silently)
-			try {
-				// eslint-disable-next-line @typescript-eslint/no-require-imports
-				const ffPath = require('ffmpeg-static') as string | null;
-				if (typeof ffPath === 'string' && typeof ffmpeg.setFfmpegPath === 'function') {
-					ffmpeg.setFfmpegPath(ffPath);
-				}
-			} catch {
-				/* optional binary */
+			// Safe path wiring — never process.exit; only set when binary exists
+			const ffPath = safeLoadFfmpegPath();
+			if (ffPath && typeof ffmpeg.setFfmpegPath === 'function') {
+				ffmpeg.setFfmpegPath(ffPath);
 			}
-			try {
-				// eslint-disable-next-line @typescript-eslint/no-require-imports
-				const probe = require('ffprobe-static') as { path?: string } | string;
-				const p = typeof probe === 'string' ? probe : probe?.path;
-				if (typeof p === 'string' && typeof ffmpeg.setFfprobePath === 'function') {
-					ffmpeg.setFfprobePath(p);
-				}
-			} catch {
-				/* optional binary */
+			const probePath = safeLoadFfprobePath();
+			if (probePath && typeof ffmpeg.setFfprobePath === 'function') {
+				ffmpeg.setFfprobePath(probePath);
 			}
 			return { ffmpeg };
 		},
@@ -497,41 +541,57 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 		packageName: 'ffmpeg-static',
 		lazy: true,
 		optional: true,
-		resolve: (mod) => ({ ffmpegStatic: defaultExport(mod) ?? mod }),
+		resolve: () => {
+			const p = safeLoadFfmpegPath();
+			if (p == null) {
+				throw new Error(
+					'ffmpeg-static binary not found for this platform (or postinstall download failed). Install system ffmpeg or reinstall ffmpeg-static.',
+				);
+			}
+			return { ffmpegStatic: p };
+		},
 	},
 	{
 		injects: ['ffprobeStatic'],
 		packageName: 'ffprobe-static',
 		lazy: true,
 		optional: true,
-		resolve: (mod) => {
-			const m = mod as { path?: string };
-			return { ffprobeStatic: m.path ?? defaultExport(mod) ?? mod };
+		resolve: () => {
+			// NEVER require('ffprobe-static') without platform precheck — it can process.exit(1)
+			const p = safeLoadFfprobePath();
+			if (p == null) {
+				throw new Error(
+					'ffprobe-static binary not available for this platform/arch (or package missing). Video metadata via ffprobe will not work.',
+				);
+			}
+			return { ffprobeStatic: p };
 		},
 	},
 ];
 
 function createMissingStub(injectName: string, packageName: string): unknown {
+	const message = `Code Pro library '${injectName}' is not available (failed to load npm package '${packageName}'). Check install, platform binaries, or ESM compatibility.`;
 	const handler: ProxyHandler<object> = {
 		get(_t, prop) {
+			if (prop === CODE_PRO_MISSING) return true;
 			if (prop === Symbol.toPrimitive || prop === 'toString' || prop === 'valueOf') {
 				return () => `[missing library ${injectName}]`;
 			}
-			throw new Error(
-				`Code Pro library '${injectName}' is not available (failed to load npm package '${packageName}'). Check install or ESM compatibility.`,
-			);
+			if (prop === 'then') return undefined; // not a thenable
+			throw new Error(message);
 		},
 		apply() {
-			throw new Error(
-				`Code Pro library '${injectName}' is not available (failed to load npm package '${packageName}').`,
-			);
+			throw new Error(message);
 		},
 	};
 	const fn = () => {
-		throw new Error(
-			`Code Pro library '${injectName}' is not available (failed to load npm package '${packageName}').`,
-		);
+		throw new Error(message);
 	};
+	Object.defineProperty(fn, CODE_PRO_MISSING, {
+		value: true,
+		enumerable: false,
+		configurable: false,
+	});
 	return new Proxy(fn, handler);
 }
 
@@ -540,6 +600,34 @@ function loadEntry(entry: LibraryEntry): {
 	error?: string;
 } {
 	try {
+		// Binary packages: never bare-require when we have safe loaders
+		if (entry.packageName === 'ffprobe-static') {
+			const p = safeLoadFfprobePath();
+			if (p == null) {
+				return {
+					values: {},
+					error: 'ffprobe-static binary unavailable for this platform/arch',
+				};
+			}
+			const resolved = entry.resolve
+				? entry.resolve({ path: p })
+				: Object.fromEntries(entry.injects.map((name) => [name, p]));
+			return { values: resolved };
+		}
+		if (entry.packageName === 'ffmpeg-static') {
+			const p = safeLoadFfmpegPath();
+			if (p == null) {
+				return {
+					values: {},
+					error: 'ffmpeg-static binary unavailable',
+				};
+			}
+			const resolved = entry.resolve
+				? entry.resolve(p)
+				: Object.fromEntries(entry.injects.map((name) => [name, p]));
+			return { values: resolved };
+		}
+
 		const mod = req(entry.packageName);
 		const resolved = entry.resolve
 			? entry.resolve(mod)
@@ -553,51 +641,80 @@ function loadEntry(entry: LibraryEntry): {
 
 export interface LoadLibrariesResult {
 	globals: Record<string, unknown>;
-	/** Names that resolved at least once (eager) or are registered (lazy until touch). */
+	/** All registered inject names (including lazy). */
 	loaded: string[];
 	failed: Array<{ inject: string; packageName: string; error: string }>;
+	/** Registered minus known failures / stubs (optimistic for untouched lazy). */
 	availableList: string[];
 }
 
 /**
  * Build sandbox globals. Eager entries load immediately; lazy entries use getters.
+ * Default is lazy (lazy !== false).
  */
 export function loadLibraryGlobals(): LoadLibrariesResult {
 	const globals: Record<string, unknown> = {};
-	const loaded: string[] = [];
-	const failed: LoadLibrariesResult['failed'] = [];
 	const cache = new Map<string, unknown>();
+	const failed: LoadLibrariesResult['failed'] = [];
+	const failedInjects = new Set<string>();
+
+	const registeredNames = [
+		...new Set(LIBRARY_ENTRIES.flatMap((e) => e.injects).concat(['utils'])),
+	].sort();
+
+	const markFailed = (inject: string, packageName: string, error: string) => {
+		failedInjects.add(inject);
+		if (!failed.some((f) => f.inject === inject && f.packageName === packageName)) {
+			failed.push({ inject, packageName, error });
+		}
+	};
+
+	const computeAvailable = (): string[] => {
+		const names: string[] = [];
+		for (const name of registeredNames) {
+			if (name === 'utils') {
+				names.push(name);
+				continue;
+			}
+			if (failedInjects.has(name)) continue;
+			if (cache.has(name) && isMissingLibrary(cache.get(name))) continue;
+			const desc = Object.getOwnPropertyDescriptor(globals, name);
+			if (desc && 'value' in desc && isMissingLibrary(desc.value)) continue;
+			names.push(name);
+		}
+		return names.sort();
+	};
 
 	for (const entry of LIBRARY_ENTRIES) {
-		const isLazy = entry.lazy !== false && (entry.lazy === true || entry.optional === true);
+		// Default lazy unless explicitly lazy: false
+		const isLazy = entry.lazy !== false;
 
 		if (!isLazy) {
 			const { values, error } = loadEntry(entry);
 			if (error) {
 				for (const name of entry.injects) {
-					globals[name] = createMissingStub(name, entry.packageName);
-					failed.push({ inject: name, packageName: entry.packageName, error });
+					const stub = createMissingStub(name, entry.packageName);
+					globals[name] = stub;
+					cache.set(name, stub);
+					markFailed(name, entry.packageName, error);
 				}
 				continue;
 			}
 			for (const [name, value] of Object.entries(values)) {
-				if (value !== undefined) {
+				if (value !== undefined && !isMissingLibrary(value)) {
 					globals[name] = value;
-					loaded.push(name);
 					cache.set(name, value);
 				} else {
-					globals[name] = createMissingStub(name, entry.packageName);
-					failed.push({
-						inject: name,
-						packageName: entry.packageName,
-						error: 'resolved to undefined',
-					});
+					const stub = createMissingStub(name, entry.packageName);
+					globals[name] = stub;
+					cache.set(name, stub);
+					markFailed(name, entry.packageName, 'resolved to undefined');
 				}
 			}
 			continue;
 		}
 
-		// Lazy: define getters on a holder object we merge via defineProperty on globals bag
+		// Lazy: define getters — do not object-spread later (would eager-load)
 		for (const injectName of entry.injects) {
 			Object.defineProperty(globals, injectName, {
 				enumerable: true,
@@ -610,74 +727,47 @@ export function loadLibraryGlobals(): LoadLibrariesResult {
 					if (error) {
 						const stub = createMissingStub(injectName, entry.packageName);
 						cache.set(injectName, stub);
-						failed.push({ inject: injectName, packageName: entry.packageName, error });
+						markFailed(injectName, entry.packageName, error);
+						// Materialize stub so subsequent access is data property
+						Object.defineProperty(globals, injectName, {
+							enumerable: true,
+							configurable: true,
+							writable: true,
+							value: stub,
+						});
 						return stub;
 					}
 					for (const [name, value] of Object.entries(values)) {
-						const v = value ?? createMissingStub(name, entry.packageName);
+						const v =
+							value !== undefined ? value : createMissingStub(name, entry.packageName);
+						if (value === undefined) {
+							markFailed(name, entry.packageName, 'resolved to undefined');
+						}
 						cache.set(name, v);
-						// Materialize sibling injects from same entry
 						Object.defineProperty(globals, name, {
 							enumerable: true,
 							configurable: true,
 							writable: true,
 							value: v,
 						});
-						if (!loaded.includes(name) && value !== undefined) {
-							loaded.push(name);
-						}
 					}
 					return cache.get(injectName);
 				},
 			});
-			// Count as available for SuperCode checklist (registered)
-			if (!loaded.includes(injectName)) {
-				loaded.push(injectName);
-			}
 		}
 	}
 
-	// Only list injects that successfully resolved (not stubs / not mere lazy registration)
-	const successfullyLoaded = new Set<string>();
-	for (const name of loaded) {
-		// eager successes were pushed only on value !== undefined
-		if (cache.has(name) || Object.getOwnPropertyDescriptor(globals, name)?.value !== undefined) {
-			const desc = Object.getOwnPropertyDescriptor(globals, name);
-			if (desc && 'value' in desc && desc.value !== undefined && typeof desc.get !== 'function') {
-				successfullyLoaded.add(name);
-			}
-		}
-	}
-	// Eager entries put values directly
-	for (const name of Object.keys(globals)) {
-		const desc = Object.getOwnPropertyDescriptor(globals, name);
-		if (desc && 'value' in desc && desc.value !== undefined && typeof desc.get !== 'function') {
-			if (name !== 'utils') successfullyLoaded.add(name);
-		}
-	}
-
-	const availableList = [...successfullyLoaded].sort();
-	// Also expose registered inject names (including lazy-not-yet-touched) separately via utils
-	const registeredNames = [
-		...new Set(LIBRARY_ENTRIES.flatMap((e) => e.injects).concat(['utils'])),
-	].sort();
-
-	globals.utils = createUtilsBag(() => {
-		const names = new Set(successfullyLoaded);
-		for (const key of cache.keys()) {
-			const v = cache.get(key);
-			if (v !== undefined) names.add(key);
-		}
-		return [...names].sort();
+	globals.utils = createUtilsBag({
+		getAvailableLibraries: computeAvailable,
+		getRegisteredLibraries: () => registeredNames,
+		getFailedLibraries: () => [...failed],
 	});
-	// Extended discovery for power users
-	(globals.utils as Record<string, unknown>).getRegisteredLibraries = () => registeredNames;
 
 	return {
 		globals,
 		loaded: registeredNames,
 		failed,
-		availableList,
+		availableList: computeAvailable(),
 	};
 }
 
@@ -699,7 +789,7 @@ export function getAllowedRequirePackages(): string[] {
 	const names = new Set(LIBRARY_ENTRIES.map((e) => e.packageName));
 	names.add('crypto');
 	// Aliases users often type
-	names.add('moment'); // → resolve in restrictedRequire
+	names.add('moment');
 	names.add('fuse.js');
 	names.add('crypto-js');
 	names.add('jsonwebtoken');
@@ -720,4 +810,7 @@ export const REQUIRE_ALIASES: Record<string, string> = {
 	cheerio: 'cheerio',
 	lodash: 'lodash',
 	axios: 'axios',
+	jimp: 'jimp',
+	Jimp: 'jimp',
+	ffmpeg: 'fluent-ffmpeg',
 };

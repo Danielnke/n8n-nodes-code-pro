@@ -6,13 +6,22 @@
 |---|---|
 | Package | `n8n-nodes-code-pro` |
 | Node | **Code Pro** (`codePro`) |
-| Version | **0.2.3** |
+| Version | **0.2.4** |
 | Language | JavaScript only |
 | Inject globals | **70+** names (aliases included; see list below) |
 | npm packages | **60+** runtime libraries + first-party `utils` |
 
 Globals are available **by name in your script** (e.g. `_.map(...)`, `dayjs()`, `z.object(...)`).  
-Runtime inventory: `utils.getAvailableLibraries()`.
+Runtime inventory:
+
+| Helper | Meaning |
+|---|---|
+| `utils.getRegisteredLibraries()` | Every inject name declared in the package |
+| `utils.getAvailableLibraries()` | Registered libs minus known load failures (lazy libs count until they fail) |
+| `utils.getFailedLibraries()` | Injects that failed to load (package/binary/platform) |
+| `utils.isLibraryAvailable('Jimp')` | Boolean check for one name |
+
+Heavy libraries (image, video, blockchain, spreadsheets, …) **load on first use**.
 
 ---
 
@@ -150,6 +159,10 @@ Inject name = global in the Code Pro sandbox. Aliases share the same package.
 
 ## Install (self-hosted)
 
+This package is large (many automation libraries + optional ffmpeg binaries). Prefer a machine with enough disk/RAM. Persist `~/.n8n` (Docker: `/home/node/.n8n`). In **queue mode**, install on every worker.
+
+Video tools use `ffmpeg-static` / `ffprobe-static` when the binary exists for your OS/arch; otherwise install system `ffmpeg` and set paths in code via `ffmpeg.setFfmpegPath(...)`.
+
 ### Community Nodes UI (after publish)
 
 1. Settings → Community Nodes → Install  
@@ -179,8 +192,8 @@ Restart n8n. Palette: **Code Pro**.
 |---|---|
 | **Mode** | Run Once for All Items / Run Once for Each Item |
 | **JavaScript** | Your script (`jsCode`); libraries are globals |
-| **Options → Timeout** | Seconds (default 30) |
-| **Options → Max Output Items** | Fail if more items returned (default 10 000) |
+| **Options → Timeout** | Soft timeout seconds (default 30). Does not hard-kill async HTTP/ffmpeg |
+| **Options → Max Output Items** | Fail if more items returned (default 10 000); not bypassed by continueOnFail |
 
 **Return shape:** all-items → `[{ json: { ... } }, ...]`; each-item → single `{ json: { ... } }`. Prefer `pairedItem` when counts differ.
 

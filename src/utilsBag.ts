@@ -7,7 +7,22 @@ export interface RetryOptions {
 	delay?: number;
 }
 
-export function createUtilsBag(getAvailableLibraries: () => string[]): Record<string, unknown> {
+export interface UtilsBagOptions {
+	/** Libraries expected to work (registered minus known failures / stubs). */
+	getAvailableLibraries: () => string[];
+	/** Every inject name declared in the registry (including not-yet-touched lazy). */
+	getRegisteredLibraries: () => string[];
+	/** Libraries that failed to load (if tracked). */
+	getFailedLibraries?: () => Array<{ inject: string; packageName: string; error: string }>;
+}
+
+export function createUtilsBag(options: UtilsBagOptions): Record<string, unknown> {
+	const {
+		getAvailableLibraries,
+		getRegisteredLibraries,
+		getFailedLibraries = () => [],
+	} = options;
+
 	return {
 		sleep: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
 
@@ -64,11 +79,23 @@ export function createUtilsBag(getAvailableLibraries: () => string[]): Record<st
 				.replace(/on\w+\s*=/gi, '')
 				.trim(),
 
-		/** Libraries that have successfully loaded (not stubs / not merely registered). */
+		/**
+		 * Libraries that should work: registered injects minus known load failures / stubs.
+		 * Lazy libs count as available until a failed load is observed.
+		 */
 		getAvailableLibraries,
 
-		/** All inject names declared in the registry (may include lazy not yet loaded). */
-		getRegisteredLibraries: () => getAvailableLibraries(),
+		/** All inject names declared in the registry (includes lazy not yet touched). */
+		getRegisteredLibraries,
+
+		/** Injects that failed to resolve (package missing / ESM / binary / etc.). */
+		getFailedLibraries,
+
+		/** True if global is present and not a missing-library stub. */
+		isLibraryAvailable: (name: string) => {
+			const available = getAvailableLibraries();
+			return available.includes(name);
+		},
 
 		memoryUsage: () => {
 			const usage = process.memoryUsage();

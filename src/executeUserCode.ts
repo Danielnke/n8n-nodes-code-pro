@@ -115,7 +115,14 @@ export function buildSandbox(options: RunUserCodeOptions): Context {
 	let dataProxy: Record<string, unknown> = {};
 	try {
 		dataProxy = ctx.getWorkflowDataProxy(itemIndex) as unknown as Record<string, unknown>;
-	} catch {
+	} catch (error) {
+		const logger = (
+			ctx as unknown as { logger?: { warn: (m: string) => void } }
+		).logger;
+		const message = error instanceof Error ? error.message : String(error);
+		logger?.warn?.(
+			`[Code Pro] getWorkflowDataProxy failed at item ${itemIndex}: ${message}. Stock $ helpers may be incomplete.`,
+		);
 		dataProxy = {};
 	}
 
@@ -176,9 +183,10 @@ export function buildSandbox(options: RunUserCodeOptions): Context {
 		require: restrictedRequire,
 	};
 
-	// Preserve lazy getters — do NOT object-spread libraryGlobals (that would eager-load)
+	// Preserve lazy getters — do NOT object-spread libraryGlobals (that would eager-load).
+	// Use getOwnPropertyNames so non-enumerable injects still copy.
 	if (loadLibraries) {
-		for (const key of Object.keys(libraryGlobals)) {
+		for (const key of Object.getOwnPropertyNames(libraryGlobals)) {
 			const desc = Object.getOwnPropertyDescriptor(libraryGlobals, key);
 			if (desc) {
 				Object.defineProperty(sandbox, key, desc);
@@ -199,7 +207,11 @@ export function createVmExecutableCode(code: string): string {
 
 /**
  * Execute user JavaScript.
- * Applies wall-clock timeout to the full async run (not just sync VM eval).
+ *
+ * Timeout is **soft / best-effort**:
+ * - VM `timeout` only covers the synchronous evaluation window.
+ * - Async work uses Promise.race; it does **not** cancel in-flight axios/ffmpeg/timers.
+ * - Orphan rejections after a timeout win are swallowed to avoid crashing n8n.
  */
 export async function runUserCode(options: RunUserCodeOptions): Promise<unknown> {
 	const { code, timeoutSec } = options;
@@ -208,12 +220,14 @@ export async function runUserCode(options: RunUserCodeOptions): Promise<unknown>
 	const timeoutMs = Math.max(1, timeoutSec) * 1000;
 
 	let timer: ReturnType<typeof setTimeout> | undefined;
+	let timedOut = false;
 
 	const timeoutPromise = new Promise<never>((_resolve, reject) => {
 		timer = setTimeout(() => {
+			timedOut = true;
 			reject(
 				new Error(
-					`Code Pro execution timed out after ${timeoutSec}s. Reduce work, avoid hanging HTTP, or increase Options → Timeout.`,
+					`Code Pro soft timeout after ${timeoutSec}s (async work may still run briefly). Reduce work, avoid hanging HTTP/ffmpeg, or increase Options → Timeout.`,
 				),
 			);
 		}, timeoutMs);
@@ -224,13 +238,23 @@ export async function runUserCode(options: RunUserCodeOptions): Promise<unknown>
 	});
 
 	try {
-		// VM timeout still helps for tight sync loops; Promise.race covers await work
+		// VM timeout still helps for tight sync loops; Promise.race covers await work (soft)
 		const vmResult = runInContext(executable, context, {
 			timeout: timeoutMs,
 			displayErrors: true,
 		}) as unknown;
 
-		const result = await Promise.race([Promise.resolve(vmResult), timeoutPromise]);
+		const work = Promise.resolve(vmResult);
+		// If timeout wins, a later rejection must not become unhandledRejection on n8n
+		work.catch(() => {
+			/* orphaned after soft timeout */
+		});
+
+		const result = await Promise.race([work, timeoutPromise]);
+		if (timedOut) {
+			// should not reach (race rejects), but keep type safety
+			throw new Error(`Code Pro soft timeout after ${timeoutSec}s.`);
+		}
 		return result;
 	} catch (error) {
 		const err = error as Error & { code?: string };
@@ -239,7 +263,7 @@ export async function runUserCode(options: RunUserCodeOptions): Promise<unknown>
 			err.code === 'ERR_SCRIPT_EXECUTION_TIMEOUT'
 		) {
 			throw new Error(
-				`Code Pro execution timed out after ${timeoutSec}s. Reduce work or increase the Timeout parameter.`,
+				`Code Pro execution timed out after ${timeoutSec}s (sync VM limit). Reduce work or increase the Timeout parameter.`,
 			);
 		}
 		throw error;

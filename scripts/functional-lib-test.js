@@ -140,14 +140,52 @@ const TESTS = {
 	XMLBuilder: '() => typeof XMLBuilder === "function"',
 	ExcelJS: '() => typeof ExcelJS.Workbook === "function" || typeof ExcelJS === "function"',
 	xlsx: '() => typeof xlsx.utils === "object"',
-	// Image
-	Jimp: '() => typeof Jimp.read === "function" || typeof Jimp === "function"',
+	// Image — real encode/decode ops (not just typeof); uses injected PNG/Jimp/JPEG
+	Jimp: `async () => {
+		const png = new PNG({ width: 4, height: 4 });
+		for (let i = 0; i < png.data.length; i += 4) {
+			png.data[i] = 255; png.data[i+1] = 0; png.data[i+2] = 0; png.data[i+3] = 255;
+		}
+		const buf = PNG.sync.write(png);
+		const img = await Jimp.read(buf);
+		const w = img.bitmap?.width ?? img.width;
+		if (w !== 4) return false;
+		if (typeof img.resize === 'function') img.resize(2, 2);
+		const mime = Jimp.MIME_PNG || 'image/png';
+		if (typeof img.getBufferAsync === 'function') {
+			const out = await img.getBufferAsync(mime);
+			return Buffer.isBuffer(out) && out.length > 0;
+		}
+		return true;
+	}`,
 	jimp: '() => typeof jimp.read === "function" || typeof jimp === "function"',
-	imageSize: '() => typeof imageSize === "function"',
+	imageSize: `() => {
+		const png = new PNG({ width: 3, height: 5 });
+		png.data = Buffer.alloc(3 * 5 * 4, 10);
+		const buf = PNG.sync.write(png);
+		const s = imageSize(buf);
+		return s.width === 3 && s.height === 5;
+	}`,
 	exifr: '() => typeof exifr.parse === "function" || typeof exifr === "object"',
-	JPEG: '() => typeof JPEG.decode === "function" || typeof JPEG.encode === "function"',
-	PNG: '() => typeof PNG === "function" || typeof PNG.sync === "object"',
-	ffprobeStatic: '() => typeof ffprobeStatic === "string" || typeof ffprobeStatic === "object"',
+	JPEG: `() => {
+		const raw = { data: Buffer.alloc(4 * 2 * 2, 128), width: 2, height: 2 };
+		const enc = JPEG.encode(raw, 50);
+		const dec = JPEG.decode(enc.data);
+		return dec.width === 2 && dec.height === 2;
+	}`,
+	PNG: `() => {
+		const png = new PNG({ width: 2, height: 2 });
+		png.data = Buffer.alloc(16, 200);
+		const buf = PNG.sync.write(png);
+		const again = PNG.sync.read(buf);
+		return again.width === 2 && again.height === 2;
+	}`,
+	// Video binaries — must be real existing paths (uses __fs from test sandbox)
+	ffmpegStatic:
+		'() => typeof ffmpegStatic === "string" && ffmpegStatic.length > 0 && __fs.existsSync(ffmpegStatic)',
+	ffprobeStatic:
+		'() => typeof ffprobeStatic === "string" && ffprobeStatic.length > 0 && __fs.existsSync(ffprobeStatic)',
+	ffmpeg: '() => typeof ffmpeg === "function"',
 };
 
 async function runOne(name, globals) {
@@ -165,8 +203,15 @@ async function runOne(name, globals) {
 	}
 	const code = `module.exports = async function(){ const __t = ${test}; return await __t(); }()`;
 	// Copy descriptors so lazy libs stay lazy until this test accesses them
-	const sandbox = { Buffer, console, setTimeout, clearTimeout, URL };
-	for (const key of Object.keys(globals)) {
+	const sandbox = {
+		Buffer,
+		console,
+		setTimeout,
+		clearTimeout,
+		URL,
+		__fs: require('fs'),
+	};
+	for (const key of Object.getOwnPropertyNames(globals)) {
 		const desc = Object.getOwnPropertyDescriptor(globals, key);
 		if (desc) Object.defineProperty(sandbox, key, desc);
 	}

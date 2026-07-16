@@ -1,7 +1,7 @@
 {
   "name": "n8n-nodes-code-pro",
-  "version": "0.2.3",
-  "description": "Code Pro — JavaScript Code node for n8n with stock-compatible execution and 60+ built-in automation libraries (data, images, video tooling)",
+  "version": "0.2.4",
+  "description": "Code Pro — JavaScript Code node for n8n with stock-compatible execution and 60+ built-in automation libraries (data, image, video tooling)",
   "keywords": [
     "n8n-community-node-package",
     "n8n",
@@ -24,7 +24,8 @@
     "dev": "tsc --watch",
     "lint": "tsc --noEmit",
     "smoke:libs": "node scripts/smoke-libs.js",
-    "test:libs": "node scripts/functional-lib-test.js"
+    "test:libs": "node scripts/functional-lib-test.js",
+    "verify:n8n-sim": "node scripts/verify-n8n-sim.js"
   },
   "files": [
     "dist"
