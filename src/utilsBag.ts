@@ -64,7 +64,11 @@ export function createUtilsBag(getAvailableLibraries: () => string[]): Record<st
 				.replace(/on\w+\s*=/gi, '')
 				.trim(),
 
+		/** Libraries that have successfully loaded (not stubs / not merely registered). */
 		getAvailableLibraries,
+
+		/** All inject names declared in the registry (may include lazy not yet loaded). */
+		getRegisteredLibraries: () => getAvailableLibraries(),
 
 		memoryUsage: () => {
 			const usage = process.memoryUsage();

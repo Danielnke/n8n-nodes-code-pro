@@ -464,7 +464,33 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 		packageName: 'fluent-ffmpeg',
 		lazy: true,
 		optional: true,
-		resolve: (mod) => ({ ffmpeg: defaultExport(mod) }),
+		resolve: (mod) => {
+			const ffmpeg = defaultExport(mod) as {
+				setFfmpegPath?: (p: string) => void;
+				setFfprobePath?: (p: string) => void;
+			};
+			// Auto-wire static binaries when present (video automation otherwise fails silently)
+			try {
+				// eslint-disable-next-line @typescript-eslint/no-require-imports
+				const ffPath = require('ffmpeg-static') as string | null;
+				if (typeof ffPath === 'string' && typeof ffmpeg.setFfmpegPath === 'function') {
+					ffmpeg.setFfmpegPath(ffPath);
+				}
+			} catch {
+				/* optional binary */
+			}
+			try {
+				// eslint-disable-next-line @typescript-eslint/no-require-imports
+				const probe = require('ffprobe-static') as { path?: string } | string;
+				const p = typeof probe === 'string' ? probe : probe?.path;
+				if (typeof p === 'string' && typeof ffmpeg.setFfprobePath === 'function') {
+					ffmpeg.setFfprobePath(p);
+				}
+			} catch {
+				/* optional binary */
+			}
+			return { ffmpeg };
+		},
 	},
 	{
 		injects: ['ffmpegStatic'],
@@ -472,6 +498,16 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 		lazy: true,
 		optional: true,
 		resolve: (mod) => ({ ffmpegStatic: defaultExport(mod) ?? mod }),
+	},
+	{
+		injects: ['ffprobeStatic'],
+		packageName: 'ffprobe-static',
+		lazy: true,
+		optional: true,
+		resolve: (mod) => {
+			const m = mod as { path?: string };
+			return { ffprobeStatic: m.path ?? defaultExport(mod) ?? mod };
+		},
 	},
 ];
 
@@ -601,15 +637,48 @@ export function loadLibraryGlobals(): LoadLibrariesResult {
 		}
 	}
 
-	const availableList = [...new Set(loaded)].sort();
+	// Only list injects that successfully resolved (not stubs / not mere lazy registration)
+	const successfullyLoaded = new Set<string>();
+	for (const name of loaded) {
+		// eager successes were pushed only on value !== undefined
+		if (cache.has(name) || Object.getOwnPropertyDescriptor(globals, name)?.value !== undefined) {
+			const desc = Object.getOwnPropertyDescriptor(globals, name);
+			if (desc && 'value' in desc && desc.value !== undefined && typeof desc.get !== 'function') {
+				successfullyLoaded.add(name);
+			}
+		}
+	}
+	// Eager entries put values directly
+	for (const name of Object.keys(globals)) {
+		const desc = Object.getOwnPropertyDescriptor(globals, name);
+		if (desc && 'value' in desc && desc.value !== undefined && typeof desc.get !== 'function') {
+			if (name !== 'utils') successfullyLoaded.add(name);
+		}
+	}
+
+	const availableList = [...successfullyLoaded].sort();
+	// Also expose registered inject names (including lazy-not-yet-touched) separately via utils
+	const registeredNames = [
+		...new Set(LIBRARY_ENTRIES.flatMap((e) => e.injects).concat(['utils'])),
+	].sort();
+
 	globals.utils = createUtilsBag(() => {
-		// Refresh: include any lazy that was touched
-		const names = new Set(availableList);
-		for (const key of cache.keys()) names.add(key);
+		const names = new Set(successfullyLoaded);
+		for (const key of cache.keys()) {
+			const v = cache.get(key);
+			if (v !== undefined) names.add(key);
+		}
 		return [...names].sort();
 	});
+	// Extended discovery for power users
+	(globals.utils as Record<string, unknown>).getRegisteredLibraries = () => registeredNames;
 
-	return { globals, loaded: availableList, failed, availableList };
+	return {
+		globals,
+		loaded: registeredNames,
+		failed,
+		availableList,
+	};
 }
 
 let cached: LoadLibrariesResult | undefined;

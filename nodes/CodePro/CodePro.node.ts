@@ -227,7 +227,7 @@ export class CodePro implements INodeType {
 		} catch (error) {
 			if (this.continueOnFail() && mode === 'runOnceForAllItems') {
 				const message = error instanceof Error ? error.message : String(error);
-				return [[{ json: { error: message } }]];
+				return [[{ json: { error: message }, pairedItem: { item: 0 } }]];
 			}
 			throw wrapError(this, error);
 		}

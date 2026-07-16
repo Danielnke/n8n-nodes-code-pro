@@ -147,6 +147,7 @@ const TESTS = {
 	exifr: '() => typeof exifr.parse === "function" || typeof exifr === "object"',
 	JPEG: '() => typeof JPEG.decode === "function" || typeof JPEG.encode === "function"',
 	PNG: '() => typeof PNG === "function" || typeof PNG.sync === "object"',
+	ffprobeStatic: '() => typeof ffprobeStatic === "string" || typeof ffprobeStatic === "object"',
 };
 
 async function runOne(name, globals) {

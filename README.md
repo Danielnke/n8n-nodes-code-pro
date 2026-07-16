@@ -127,8 +127,9 @@ Inject name = global in the Code Pro sandbox. Aliases share the same package.
 
 | Global(s) | npm package | What it’s for |
 |---|---|---|
-| `ffmpeg` | `fluent-ffmpeg` | Programmatic FFmpeg pipelines (transcode, screenshots, filters) |
-| `ffmpegStatic` | `ffmpeg-static` | Path to bundled `ffmpeg` binary for `ffmpeg.setFfmpegPath(...)` |
+| `ffmpeg` | `fluent-ffmpeg` | Programmatic FFmpeg pipelines (transcode, screenshots, filters). Auto-wires `ffmpeg-static` / `ffprobe-static` paths when present. |
+| `ffmpegStatic` | `ffmpeg-static` | Path to bundled `ffmpeg` binary |
+| `ffprobeStatic` | `ffprobe-static` | Path to bundled `ffprobe` binary (metadata / duration) |
 
 ### Blockchain / trading (heavy; load when used)
 
@@ -143,7 +144,7 @@ Inject name = global in the Code Pro sandbox. Aliases share the same package.
 
 ### Full inject name list
 
-`_`, `lodash`, `bytes`, `ms`, `qs`, `uuid`, `nanoid`, `utils`, `dayjs`, `moment`, `dateFns`, `dateFnsTz`, `luxon`, `DateTime`, `cronParser`, `joi`, `Joi`, `yup`, `z`, `zod`, `Ajv`, `validator`, `phoneNumber`, `iban`, `papaparse`, `Papa`, `xml2js`, `XMLParser`, `XMLBuilder`, `YAML`, `ini`, `toml`, `jmespath`, `jsonDiff`, `cheerio`, `htmlToText`, `marked`, `Handlebars`, `slug`, `pluralize`, `fuzzy`, `stringSimilarity`, `franc`, `compromise`, `CryptoJS`, `nodeCrypto`, `forge`, `jwt`, `bcrypt`, `bcryptjs`, `secp256k1`, `bip39`, `axios`, `FormData`, `pRetry`, `XLSX`, `xlsx`, `ExcelJS`, `JSZip`, `pako`, `QRCode`, `Jimp`, `jimp`, `imageSize`, `exifr`, `JPEG`, `PNG`, `ffmpeg`, `ffmpegStatic`, `web3`, `ccxt`, `coinGecko`, `solana`, `bitcoin`, `ytdl`
+`_`, `lodash`, `bytes`, `ms`, `qs`, `uuid`, `nanoid`, `utils`, `dayjs`, `moment`, `dateFns`, `dateFnsTz`, `luxon`, `DateTime`, `cronParser`, `joi`, `Joi`, `yup`, `z`, `zod`, `Ajv`, `validator`, `phoneNumber`, `iban`, `papaparse`, `Papa`, `xml2js`, `XMLParser`, `XMLBuilder`, `YAML`, `ini`, `toml`, `jmespath`, `jsonDiff`, `cheerio`, `htmlToText`, `marked`, `Handlebars`, `slug`, `pluralize`, `fuzzy`, `stringSimilarity`, `franc`, `compromise`, `CryptoJS`, `nodeCrypto`, `forge`, `jwt`, `bcrypt`, `bcryptjs`, `secp256k1`, `bip39`, `axios`, `FormData`, `pRetry`, `XLSX`, `xlsx`, `ExcelJS`, `JSZip`, `pako`, `QRCode`, `Jimp`, `jimp`, `imageSize`, `exifr`, `JPEG`, `PNG`, `ffmpeg`, `ffmpegStatic`, `ffprobeStatic`, `web3`, `ccxt`, `coinGecko`, `solana`, `bitcoin`, `ytdl`
 
 ---
 
