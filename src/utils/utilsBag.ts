@@ -4,7 +4,6 @@
 
 import { getCodeProVersion } from './version';
 import { mapPool } from './mapPool';
-import { createSitemapHelpers } from './sitemap';
 import type { AxiosLike } from './sitemap/types';
 
 export interface RetryOptions {
@@ -44,9 +43,20 @@ export function createUtilsBag(options: UtilsBagOptions): Record<string, unknown
 		getAxios = defaultGetAxios,
 	} = options;
 
-	const sitemap = createSitemapHelpers({ getAxios });
+	// Lazy: don't pull sitemap/http/parse (and their deps) until utils.sitemap is used
+	let sitemapHelpers: Record<string, unknown> | undefined;
+	const getSitemap = () => {
+		if (!sitemapHelpers) {
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const { createSitemapHelpers } = require('./sitemap') as {
+				createSitemapHelpers: (deps: { getAxios: () => AxiosLike }) => Record<string, unknown>;
+			};
+			sitemapHelpers = createSitemapHelpers({ getAxios });
+		}
+		return sitemapHelpers;
+	};
 
-	return {
+	const bag: Record<string, unknown> = {
 		/** Package version of the loaded Code Pro build (for live n8n L1 checks). */
 		getCodeProVersion,
 
@@ -75,8 +85,6 @@ export function createUtilsBag(options: UtilsBagOptions): Record<string, unknown
 		 */
 		mapPool,
 
-		/** Sitemap discovery / parse / expand helpers (see README). */
-		sitemap,
 
 		flatten: function flatten(
 			obj: Record<string, unknown>,
@@ -142,4 +150,12 @@ export function createUtilsBag(options: UtilsBagOptions): Record<string, unknown
 			};
 		},
 	};
+
+	Object.defineProperty(bag, 'sitemap', {
+		enumerable: true,
+		configurable: true,
+		get: getSitemap,
+	});
+
+	return bag;
 }

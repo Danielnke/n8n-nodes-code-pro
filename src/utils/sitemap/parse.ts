@@ -1,22 +1,39 @@
 /**
  * Parse sitemap XML (urlset / sitemapindex) without network I/O.
+ *
+ * fast-xml-parser is required lazily so incomplete community installs don't
+ * crash the whole Code Pro package at load time (node still registers).
  */
 
-import { XMLParser } from 'fast-xml-parser';
 import { detectKind, looksLikeXml, stripBom } from './detect';
 import type { SitemapKind, SitemapParseResult, SitemapUrlEntry } from './types';
 
-const parser = new XMLParser({
-	ignoreAttributes: false,
-	attributeNamePrefix: '@_',
-	// Keep text nodes accessible; strip namespace prefixes on tags where possible
-	removeNSPrefix: true,
-	trimValues: true,
-	isArray: (name) => {
-		const n = String(name).toLowerCase();
-		return n === 'url' || n === 'sitemap' || n === 'loc';
-	},
-});
+type XmlParserInstance = { parse: (xml: string) => unknown };
+
+let parser: XmlParserInstance | null | undefined;
+
+function getParser(): XmlParserInstance | null {
+	if (parser !== undefined) return parser;
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
+		const { XMLParser } = require('fast-xml-parser') as {
+			XMLParser: new (opts: Record<string, unknown>) => XmlParserInstance;
+		};
+		parser = new XMLParser({
+			ignoreAttributes: false,
+			attributeNamePrefix: '@_',
+			removeNSPrefix: true,
+			trimValues: true,
+			isArray: (name: string) => {
+				const n = String(name).toLowerCase();
+				return n === 'url' || n === 'sitemap' || n === 'loc';
+			},
+		});
+	} catch {
+		parser = null;
+	}
+	return parser;
+}
 
 function asArray<T>(value: T | T[] | null | undefined): T[] {
 	if (value == null) return [];
@@ -102,8 +119,26 @@ export function parseSitemapXml(rawXml: string | null | undefined): SitemapParse
 	const kindHint = detectKind(rawXml);
 	let kind: SitemapKind = kindHint;
 
+	const xmlParser = getParser();
+	if (!xmlParser) {
+		// Package missing / incomplete install — still return locs via regex
+		const scraped = scrapeLocs(rawXml);
+		if (!scraped.length) {
+			return { kind: kindHint, locs: [], sitemaps: [], urls: [] };
+		}
+		if (kindHint === 'sitemapindex') {
+			return { kind: 'sitemapindex', locs: [], sitemaps: scraped, urls: [] };
+		}
+		return {
+			kind: kindHint ?? 'unknown',
+			locs: scraped,
+			sitemaps: [],
+			urls: scraped.map((loc) => ({ loc })),
+		};
+	}
+
 	try {
-		const doc = parser.parse(stripBom(rawXml)) as Record<string, unknown>;
+		const doc = xmlParser.parse(stripBom(rawXml)) as Record<string, unknown>;
 		// Roots may be urlset / sitemapindex (ns already stripped)
 		const urlset = (doc.urlset ?? doc.URLSET) as Record<string, unknown> | undefined;
 		const sitemapindex = (doc.sitemapindex ?? doc.sitemapIndex ?? doc.SITEMAPINDEX) as
