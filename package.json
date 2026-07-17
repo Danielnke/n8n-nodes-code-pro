@@ -20,7 +20,7 @@
   },
   "main": "dist/nodes/CodePro/CodePro.node.js",
   "scripts": {
-    "build": "tsc && node -e \"const fs=require('fs');const path=require('path');const src='nodes/CodePro/codepro.svg';const dest='dist/nodes/CodePro/codepro.svg';fs.mkdirSync(path.dirname(dest),{recursive:true});if(fs.existsSync(src))fs.copyFileSync(src,dest);\"",
+    "build": "tsc && node -e \"const fs=require('fs');const path=require('path');const src='nodes/CodePro/codepro.png';const dest='dist/nodes/CodePro/codepro.png';fs.mkdirSync(path.dirname(dest),{recursive:true});if(fs.existsSync(src))fs.copyFileSync(src,dest); try{fs.unlinkSync('dist/nodes/CodePro/codepro.svg')}catch(e){}\"",
     "dev": "tsc --watch",
     "lint": "tsc --noEmit",
     "smoke:libs": "node scripts/smoke-libs.js",

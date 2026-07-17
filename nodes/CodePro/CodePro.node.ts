@@ -39,7 +39,7 @@ export class CodePro implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Code Pro',
 		name: 'codePro',
-		icon: { light: 'file:codepro.svg', dark: 'file:codepro.svg' },
+		icon: { light: 'file:codepro.png', dark: 'file:codepro.png' },
 		group: ['transform'],
 		version: 1,
 		description:
