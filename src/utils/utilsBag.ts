@@ -1,8 +1,11 @@
 /**
- * First-party `utils` global for Code Pro (sleep, retry, inventory helpers).
+ * First-party `utils` global for Code Pro (sleep, retry, sitemap, inventory helpers).
  */
 
 import { getCodeProVersion } from './version';
+import { mapPool } from './mapPool';
+import { createSitemapHelpers } from './sitemap';
+import type { AxiosLike } from './sitemap/types';
 
 export interface RetryOptions {
 	attempts?: number;
@@ -16,6 +19,21 @@ export interface UtilsBagOptions {
 	getRegisteredLibraries: () => string[];
 	/** Libraries that failed to load (if tracked). */
 	getFailedLibraries?: () => Array<{ inject: string; packageName: string; error: string }>;
+	/**
+	 * Resolve axios for utils.sitemap / network helpers.
+	 * Prefer the same instance as the sandbox `axios` inject.
+	 */
+	getAxios?: () => AxiosLike;
+}
+
+function defaultGetAxios(): AxiosLike {
+	// Lazy require so cold paths without sitemap don't pay unless used
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
+	const mod = require('axios') as { default?: AxiosLike } & AxiosLike;
+	const ax = (mod && typeof (mod as { default?: AxiosLike }).default === 'function'
+		? (mod as { default: AxiosLike }).default
+		: mod) as AxiosLike;
+	return ax;
 }
 
 export function createUtilsBag(options: UtilsBagOptions): Record<string, unknown> {
@@ -23,7 +41,10 @@ export function createUtilsBag(options: UtilsBagOptions): Record<string, unknown
 		getAvailableLibraries,
 		getRegisteredLibraries,
 		getFailedLibraries = () => [],
+		getAxios = defaultGetAxios,
 	} = options;
+
+	const sitemap = createSitemapHelpers({ getAxios });
 
 	return {
 		/** Package version of the loaded Code Pro build (for live n8n L1 checks). */
@@ -47,6 +68,15 @@ export function createUtilsBag(options: UtilsBagOptions): Record<string, unknown
 			}
 			throw lastError;
 		},
+
+		/**
+		 * Run async work over items with bounded concurrency (order-preserving).
+		 * Useful for multi-site HTTP batches outside sitemap helpers.
+		 */
+		mapPool,
+
+		/** Sitemap discovery / parse / expand helpers (see README). */
+		sitemap,
 
 		flatten: function flatten(
 			obj: Record<string, unknown>,

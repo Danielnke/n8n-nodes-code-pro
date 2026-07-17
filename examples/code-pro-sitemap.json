@@ -1,0 +1,52 @@
+{
+  "name": "Code Pro — Sitemap discover & expand",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "When clicking ‘Execute workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  { json: { website: 'example.com' } }\n];"
+      },
+      "id": "sample-sites",
+      "name": "Sample Websites",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Code Pro — sitemap discovery (All Items)\n// Raise Timeout for multi-site batches. Expand carefully (maxUrls / Max Output Items).\nconst sites = $input.all().map((i) => i.json.website || i.json.Website);\n\nconst results = await utils.sitemap.fromWebsites(sites, {\n  expand: false,          // set true to walk indexes → page URLs\n  websiteConcurrency: 3,\n  concurrency: 4,\n  timeoutMs: 8000,\n  maxUrls: 5000,\n});\n\nreturn results.map((r, index) => ({\n  json: {\n    website: r.website,\n    found: r.found,\n    sourceUrl: r.sourceUrl,\n    kind: r.kind,\n    robotsSitemaps: r.robotsSitemaps,\n    // rawXml can be large — keep only when you need it\n    hasXml: !!r.rawXml,\n    xmlLength: r.rawXml ? r.rawXml.length : 0,\n    attemptCount: r.attempts?.length ?? 0,\n    // Uncomment for page URL fan-out instead of one item per site:\n    // urls: r.urls,\n    // truncated: r.truncated,\n  },\n  pairedItem: { item: index },\n}));\n",
+        "options": {
+          "timeout": 90,
+          "maxOutputItems": 10000
+        }
+      },
+      "id": "code-pro-sitemap",
+      "name": "Code Pro — Sitemap",
+      "type": "n8n-nodes-code-pro.codePro",
+      "typeVersion": 1,
+      "position": [480, 0]
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [[{ "node": "Sample Websites", "type": "main", "index": 0 }]]
+    },
+    "Sample Websites": {
+      "main": [[{ "node": "Code Pro — Sitemap", "type": "main", "index": 0 }]]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -124,6 +124,19 @@ export function loadLibraryGlobals(): LoadLibrariesResult {
 		getAvailableLibraries: computeAvailable,
 		getRegisteredLibraries: () => registeredNames,
 		getFailedLibraries: () => [...failed],
+		// Prefer the same axios inject users already have in the sandbox
+		getAxios: () => {
+			const ax = globals.axios as { get?: unknown } | undefined;
+			if (ax && typeof ax.get === 'function') {
+				return ax as import('../utils/sitemap/types').AxiosLike;
+			}
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const mod = require('axios') as { default?: { get: unknown } } & { get: unknown };
+			const resolved = (mod && typeof (mod as { default?: unknown }).default === 'function'
+				? (mod as { default: { get: unknown } }).default
+				: mod) as import('../utils/sitemap/types').AxiosLike;
+			return resolved;
+		},
 	});
 
 	return {

@@ -12,6 +12,7 @@ PROJECT_PLAN.md
 TECH_SPECS.md
 FAILURE_ANALYSIS.md
 SESSION_BOOTSTRAP.md
+docs/
 
 # Dev / VCS / env
 .git/

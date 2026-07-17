@@ -18,3 +18,5 @@ PROJECT_PLAN.md
 TECH_SPECS.md
 FAILURE_ANALYSIS.md
 SESSION_BOOTSTRAP.md
+# Engineering docs folder (failure analysis, sitemap design, etc.)
+docs/

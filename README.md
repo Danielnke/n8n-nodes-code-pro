@@ -6,7 +6,7 @@
 |---|---|
 | Package | `n8n-nodes-code-pro` |
 | Node | **Code Pro** (`codePro`) |
-| Version | **0.3.1** |
+| Version | **0.4.0** |
 | Language | JavaScript only |
 | Inject globals | **70+** names (aliases included; see list below) |
 | npm packages | **60+** runtime libraries + first-party `utils` |
@@ -20,6 +20,8 @@ Runtime inventory:
 | `utils.getAvailableLibraries()` | Registered libs minus known load failures (lazy libs count until they fail) |
 | `utils.getFailedLibraries()` | Injects that failed to load (package/binary/platform) |
 | `utils.isLibraryAvailable('Jimp')` | Boolean check for one name |
+| `utils.sitemap.*` | Discover / parse / expand website sitemaps (see below) |
+| `utils.mapPool(items, n, fn)` | Bounded-concurrency async map (order-preserving) |
 
 Heavy libraries (image, video, blockchain, spreadsheets, …) **load on first use**.
 
@@ -39,7 +41,7 @@ Inject name = global in the Code Pro sandbox. Aliases share the same package.
 | `qs` | `qs` | Query-string parse/stringify |
 | `uuid` | `uuid` | UUID v1/v4/v5 (e.g. `uuid.v4()`) |
 | `nanoid` | `nanoid` | Compact unique IDs (`nanoid()` / `nanoid.nanoid()`) |
-| `utils` | *(built-in)* | `sleep`, `retry`, `flatten`, `getAvailableLibraries`, … |
+| `utils` | *(built-in)* | `sleep`, `retry`, `mapPool`, `sitemap`, `flatten`, `getAvailableLibraries`, … |
 
 ### Dates & time
 
@@ -111,6 +113,7 @@ Inject name = global in the Code Pro sandbox. Aliases share the same package.
 | `axios` | `axios` | HTTP client (GET/POST, JSON, …) |
 | `FormData` | `form-data` | Multipart form bodies |
 | `pRetry` | `p-retry` | Retry async operations |
+| `utils.sitemap` | *(built-in)* | Sitemap find / parse / expand (uses axios) |
 
 ### Spreadsheets, archives, QR
 
@@ -196,6 +199,76 @@ Restart n8n. Palette: **Code Pro**.
 | **Options → Max Output Items** | Fail if more items returned (default 10 000); not bypassed by continueOnFail |
 
 **Return shape:** all-items → `[{ json: { ... } }, ...]`; each-item → single `{ json: { ... } }`. Prefer `pairedItem` when counts differ.
+
+---
+
+## Sitemap workflows (`utils.sitemap`)
+
+First-party helpers for **sitemap-heavy** jobs: discover XML via `robots.txt` + common paths, parse urlsets/indexes, optionally expand nested indexes to page URLs. Uses the same **axios** inject (browser-like headers, gzip `.xml.gz`, parallel probes, attempt diagnostics).
+
+| Method | What it does |
+|---|---|
+| `utils.sitemap.find(website, opts?)` | Discover + fetch primary sitemap XML |
+| `utils.sitemap.parse(rawXml)` | Parse urlset / sitemapindex (no network) |
+| `utils.sitemap.expand(urlOrXml, opts?)` | Walk indexes → page URLs (caps: `maxDepth`, `maxSitemaps`, `maxUrls`) |
+| `utils.sitemap.fromWebsite(website, opts?)` | find + optional `expand: true` |
+| `utils.sitemap.fromWebsites(list, opts?)` | Batch sites (`websiteConcurrency`) |
+
+**Defaults that matter:** expand is **opt-in** (`expand: true`). Expanded `urls` are **strings** unless `includeMetadata: true`. `rawXml` is dropped when expanding (set `includeRawXml: true` to keep it). Caps default to `maxDepth: 3`, `maxSitemaps: 50`, `maxUrls: 10000`.
+
+### A) One item per site (discovery)
+
+```js
+// Mode: Run Once for All Items — raise Timeout for many sites
+const sites = $input.all().map((i) => i.json.website || i.json.Website);
+const results = await utils.sitemap.fromWebsites(sites, {
+  expand: false,
+  websiteConcurrency: 3,
+  concurrency: 4,
+  timeoutMs: 8000,
+});
+return results.map((r, index) => ({
+  json: {
+    website: r.website,
+    found: r.found,
+    sourceUrl: r.sourceUrl,
+    kind: r.kind,
+    robotsSitemaps: r.robotsSitemaps,
+    hasXml: !!r.rawXml,
+    // attempts[] explains found:false (not_xml, http_403, timeout, …)
+    attempts: r.attempts,
+  },
+  pairedItem: { item: index },
+}));
+```
+
+### B) One item per page URL (expand, cap-aware)
+
+```js
+const website = $json.website || $json.Website;
+const r = await utils.sitemap.fromWebsite(website, {
+  expand: true,
+  maxUrls: 5000,
+  maxDepth: 3,
+  concurrency: 4,
+});
+if (!r.found) {
+  return [{ json: { website, found: false, attempts: r.attempts } }];
+}
+// Watch Options → Max Output Items when fan-out is large
+return r.urls.map((loc) => ({
+  json: { loc, website, sourceUrl: r.sourceUrl, truncated: r.truncated },
+}));
+```
+
+**Tips**
+
+- Prefer **All Items** for multi-site batches.
+- Raise **Timeout** (e.g. 90–120s) for large expand / many hosts. Soft timeout does not hard-cancel in-flight axios.
+- Large expands can hit **Max Output Items** — lower `maxUrls` or batch.
+- Example workflow: `examples/code-pro-sitemap.json`
+- Offline tests: `npm run test:sitemap`
+- Design notes (repo, not on npm): `docs/SITEMAP.md`
 
 Optional workflow imports: `examples/code-pro-basic.json`, `examples/code-pro-validate-zod.json`.
 

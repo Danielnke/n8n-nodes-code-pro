@@ -2,7 +2,7 @@
 
 > **Acceptance gate.** Local `npm run smoke:libs` / `test:libs` / `verify:n8n-sim` / `test:golden` are **regression only**.  
 > Product is not “fixed” until this checklist is filled for your instance.  
-> Related: `FAILURE_ANALYSIS.md` (L0–L6), package version in root `package.json`.
+> Related: `docs/FAILURE_ANALYSIS.md` (L0–L6), `docs/SITEMAP.md` (utils.sitemap), package version in root `package.json`.
 
 ---
 
@@ -110,13 +110,43 @@ return [{ json: { status: r.status, len: String(r.data).length } }];
 | No `ReferenceError: axios is not defined` | |
 | `status` 200 **or** clear network error (not silent) | |
 
-### Probe 4 — sitemap script engine OK (L2/L5/L6)
+### Probe 4 — `utils.sitemap` engine OK (L2/L5/L6)
 
-Paste full “Fetch Sitemap XML” script. Mode: **All Items**. Input: `{ "website": "example.com" }`.
+Mode: **All Items**. Timeout ≥ 60s. Input: `{ "website": "example.com" }` (or a known-good host).
+
+```javascript
+const website = $json.website || $json.Website || 'example.com';
+const r = await utils.sitemap.fromWebsite(website, {
+  expand: false,
+  timeoutMs: 8000,
+  concurrency: 4,
+});
+return [{
+  json: {
+    found: r.found,
+    sourceUrl: r.sourceUrl,
+    kind: r.kind,
+    robots: r.robotsSitemaps,
+    attempts: r.attempts?.length,
+    // found:false is OK if attempts explain why (L6 ≠ engine fail)
+  },
+}];
+```
+
+Optional expand probe (watch Max Output Items):
+
+```javascript
+const r = await utils.sitemap.fromWebsite('example.com', {
+  expand: true,
+  maxUrls: 50,
+});
+return [{ json: { found: r.found, n: r.urls?.length, truncated: r.truncated } }];
+```
 
 | Expect | Pass? |
 |---|---|
 | **No engine error** (validation/timeout/syntax) | |
+| `utils.sitemap` is defined | |
 | Record `found` true/false separately (false is **not** automatic fail) | `found=` |
 
 ### Probe 5 — each-item multi-return (L4)
