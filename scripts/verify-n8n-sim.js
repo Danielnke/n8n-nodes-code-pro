@@ -127,7 +127,7 @@ return [{
 
 	const must = [
 		'dist/nodes/CodePro/CodePro.node.js',
-		'dist/nodes/CodePro/codepro.svg',
+		'dist/nodes/CodePro/codepro.png',
 		'dist/src/libraryRegistry.js',
 		'dist/src/executeUserCode.js',
 	];

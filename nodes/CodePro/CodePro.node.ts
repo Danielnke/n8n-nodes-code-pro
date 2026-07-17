@@ -19,20 +19,65 @@ import {
 	validateRunCodeEachItem,
 } from '../../src/resultValidation';
 
-const DEFAULT_JS = `// Code Pro — JavaScript with built-in libraries (see package README for full list)
-// Common globals: _, lodash, axios, cheerio, dayjs, moment, uuid, z, zod, Papa, YAML, ...
-// Modes: $input.all() / items  |  each-item: $json / item  |  inventory: utils.getAvailableLibraries()
+const DEFAULT_JS = `// Code Pro Node — 70+ JavaScript Libraries Available
+// Available: _, lodash, axios, cheerio, dayjs, moment, dateFns, dateFnsTz,
+//   luxon, DateTime, cronParser, joi, Joi, validator, Ajv, yup, z, zod,
+//   phoneNumber, iban, uuid, nanoid, bytes, ms, qs, slug, pluralize,
+//   xml2js, XMLParser, XMLBuilder, YAML, papaparse, Papa, ini, toml,
+//   jmespath, jsonDiff, Handlebars, htmlToText, marked, cheerio, franc,
+//   compromise, fuzzy, stringSimilarity, pRetry, FormData,
+//   CryptoJS, forge, jwt, bcrypt, bcryptjs, nodeCrypto, secp256k1, bip39,
+//   XLSX, xlsx, ExcelJS, JSZip, pako, QRCode, exifr,
+//   Jimp, jimp, imageSize, JPEG, PNG,
+//   ffmpeg, ffmpegStatic, ffprobeStatic,
+//   web3, ccxt, coinGecko, solana, bitcoin, ytdl,
+//   axios, FormData, utils
 
-const items = $input.all();
+// 🔄 EXECUTION MODE SUPPORT:
+// - "Run Once for All Items": Access all items via $input.all() or items variable
+// - "Run Once for Each Item": Access current item via $input.item or item variable
 
-return items.map((item, index) => ({
-  json: {
-    ...item.json,
-    id: uuid.v4(),
-    at: dayjs().toISOString(),
-  },
-  pairedItem: { item: index },
-}));
+// For "Run Once for All Items" mode:
+if (typeof items !== 'undefined') {
+    console.log('Running in "Run Once for All Items" mode');
+    console.log('Total items:', items.length);
+    // Process all items together
+    const allData = items.map(item => item.json);
+    return items.map((item, index) => ({
+        json: {
+            ...item.json,
+            id: uuid.v4(),
+            at: dayjs().toISOString(),
+            result: 'Processed all items together'
+        },
+        pairedItem: { item: index },
+    }));
+}
+
+// For "Run Once for Each Item" mode:
+if (typeof item !== 'undefined') {
+    console.log('Running in "Run Once for Each Item" mode');
+    console.log('Current item:', item.json);
+    // Process single item
+    return {
+        json: {
+            ...item.json,
+            id: uuid.v4(),
+            at: dayjs().toISOString(),
+            result: 'Processed individual item'
+        },
+    };
+}
+
+// Fallback
+const data = $input.first().json;
+return {
+    json: {
+        result: 'Hello from Code Pro!',
+        fallback: true,
+        ...data
+    },
+};
 `;
 
 export class CodePro implements INodeType {
@@ -134,7 +179,7 @@ export class CodePro implements INodeType {
 			},
 			{
 				displayName:
-					'<b>Mode:</b> multi-item scripts (e.g. sitemap fetch loops) need <b>Run Once for All Items</b>. Each-item accepts one object or a 1-element array. Flat objects without <code>json:</code> are auto-wrapped. Long HTTP loops: raise <b>Options → Timeout</b> (default 30s; sequential 8s axios retries can exceed it). Inventory: <code>utils.getAvailableLibraries()</code>.',
+					'<b>Mode:</b> multi-item scripts (e.g. sitemap fetch loops) need <b>Run Once for All Items</b>. Each-item accepts one object or a 1-element array. Flat objects without <code>json:</code> are auto-wrapped. Long HTTP loops: raise <b>Options → Timeout</b> (default 60s; sequential 8s axios retries can exceed it). Inventory: <code>utils.getAvailableLibraries()</code>.',
 				name: 'notice',
 				type: 'notice',
 				default: '',

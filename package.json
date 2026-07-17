@@ -1,7 +1,7 @@
 {
   "name": "n8n-nodes-code-pro",
-  "version": "0.2.5",
-  "description": "Code Pro — JavaScript Code node for n8n with stock-compatible execution and 60+ built-in automation libraries (data, image, video tooling)",
+  "version": "0.3.0",
+  "description": "Code Pro — JavaScript Code node for n8n with stock-compatible execution and 70+ built-in automation libraries (data, image, video tooling)",
   "keywords": [
     "n8n-community-node-package",
     "n8n",
@@ -14,6 +14,17 @@
   "license": "MIT",
   "author": {
     "name": "Danielnke"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Danielnke/n8n-nodes-code-pro.git"
+  },
+  "homepage": "https://github.com/Danielnke/n8n-nodes-code-pro#readme",
+  "bugs": {
+    "url": "https://github.com/Danielnke/n8n-nodes-code-pro/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=20"
@@ -28,7 +39,9 @@
     "verify:n8n-sim": "node scripts/verify-n8n-sim.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "n8n": {
     "n8nNodesApiVersion": 1,
