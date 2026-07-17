@@ -117,20 +117,36 @@ export function validateRunCodeEachItem(
 		);
 	}
 
+	// SuperCode-compat: many snippets always `return [ { ... } ]` even for one item.
+	// Stock Code rejects any array; we accept a single-element array and unwrap it.
 	if (Array.isArray(executionResult)) {
-		const firstSentence =
-			executionResult.length > 0
-				? `An array of ${typeof executionResult[0]}s was returned.`
-				: 'An empty array was returned.';
-		throw new CodeProValidationError(
-			`Code doesn't return a single object`,
-			`${firstSentence} If you need to output multiple items, use the 'Run Once for All Items' mode instead.`,
-			itemIndex,
-		);
+		if (executionResult.length === 0) {
+			return { json: {}, pairedItem: { item: itemIndex } };
+		}
+		if (executionResult.length === 1) {
+			executionResult = executionResult[0];
+			if (executionResult === null || executionResult === undefined) {
+				return { json: {}, pairedItem: { item: itemIndex } };
+			}
+			if (typeof executionResult !== 'object' || Array.isArray(executionResult)) {
+				throw new CodeProValidationError(
+					`Code doesn't return a single object`,
+					`The array's only element must be an object (got ${Array.isArray(executionResult) ? 'array' : typeof executionResult}).`,
+					itemIndex,
+				);
+			}
+		} else {
+			throw new CodeProValidationError(
+				`Code doesn't return a single object`,
+				`An array of ${executionResult.length} items was returned. In "Run Once for Each Item" mode return one object (or a one-element array). For multi-item output use "Run Once for All Items".`,
+				itemIndex,
+			);
+		}
 	}
 
 	const [returnData] = normalize(executionResult as INodeExecutionData);
 	validateItem(returnData, itemIndex);
+	// After normalize, plain SuperCode objects become { json: {...} } — only validate keys on final shape
 	validateTopLevelKeys(returnData, itemIndex);
 
 	if (returnData.pairedItem === undefined) {

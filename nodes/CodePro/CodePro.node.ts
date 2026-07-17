@@ -114,9 +114,9 @@ export class CodePro implements INodeType {
 							minValue: 1,
 							maxValue: 300,
 						},
-						default: 30,
+						default: 60,
 						description:
-							'Soft timeout in seconds (sync VM + Promise.race). Does not hard-kill async HTTP/ffmpeg; increase for long media jobs',
+							'Soft timeout in seconds (sync VM + Promise.race). Raise for sequential HTTP (sitemaps, retries) or media jobs. Does not hard-kill in-flight axios/ffmpeg',
 					},
 					{
 						displayName: 'Max Output Items',
@@ -134,7 +134,7 @@ export class CodePro implements INodeType {
 			},
 			{
 				displayName:
-					'Return <code>[{ json: { ... } }]</code> (all-items) or a single <code>{ json: { ... } }</code> (each-item). Set <code>pairedItem</code> when input/output counts differ. Inventory: <code>utils.getAvailableLibraries()</code> / <code>utils.getRegisteredLibraries()</code>. Image: <code>Jimp</code>, <code>imageSize</code>, <code>exifr</code>. Video: <code>ffmpeg</code> + static binaries.',
+					'<b>Mode:</b> multi-item scripts (e.g. sitemap fetch loops) need <b>Run Once for All Items</b>. Each-item accepts one object or a 1-element array. Flat objects without <code>json:</code> are auto-wrapped. Long HTTP loops: raise <b>Options → Timeout</b> (default 30s; sequential 8s axios retries can exceed it). Inventory: <code>utils.getAvailableLibraries()</code>.',
 				name: 'notice',
 				type: 'notice',
 				default: '',
@@ -150,7 +150,7 @@ export class CodePro implements INodeType {
 			timeout?: number;
 			maxOutputItems?: number;
 		};
-		const timeout = options.timeout ?? 30;
+		const timeout = options.timeout ?? 60;
 		const maxOutputItems = options.maxOutputItems ?? 10_000;
 
 		if (!code?.trim()) {
