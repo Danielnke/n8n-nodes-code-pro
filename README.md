@@ -6,7 +6,7 @@
 |---|---|
 | Package | `n8n-nodes-code-pro` |
 | Node | **Code Pro** (`codePro`) |
-| Version | **0.2.4** |
+| Version | **0.3.1** |
 | Language | JavaScript only |
 | Inject globals | **70+** names (aliases included; see list below) |
 | npm packages | **60+** runtime libraries + first-party `utils` |
@@ -192,7 +192,7 @@ Restart n8n. Palette: **Code Pro**.
 |---|---|
 | **Mode** | Run Once for All Items / Run Once for Each Item |
 | **JavaScript** | Your script (`jsCode`); libraries are globals |
-| **Options → Timeout** | Soft timeout seconds (default 30). Does not hard-kill async HTTP/ffmpeg |
+| **Options → Timeout** | Soft timeout seconds (default **60**). Does not hard-kill async HTTP/ffmpeg |
 | **Options → Max Output Items** | Fail if more items returned (default 10 000); not bypassed by continueOnFail |
 
 **Return shape:** all-items → `[{ json: { ... } }, ...]`; each-item → single `{ json: { ... } }`. Prefer `pairedItem` when counts differ.
@@ -215,8 +215,11 @@ npm run build
 npm run lint
 npm run smoke:libs
 npm run test:libs
+npm run test:golden
 npm run dev
 ```
+
+Live n8n acceptance (required before claiming the node works in production): see `scripts/live-n8n-checklist.md`. Use `utils.getCodeProVersion()` inside the node to confirm the loaded build.
 
 ## License
 

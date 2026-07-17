@@ -7,77 +7,33 @@ import {
 	type INodeTypeDescription,
 } from 'n8n-workflow';
 
-import { runUserCode, type CodeProMode } from '../../src/executeUserCode';
+import { runUserCode, type CodeProMode } from '../../src/execution';
 import {
+	CodeProValidationError,
 	enforceMaxOutputItems,
 	isMaxOutputItemsError,
 	maybeAddPairedItemHint,
-} from '../../src/outputGuards';
-import {
-	CodeProValidationError,
 	validateRunCodeAllItems,
 	validateRunCodeEachItem,
-} from '../../src/resultValidation';
+} from '../../src/validation';
 
-const DEFAULT_JS = `// Code Pro Node — 70+ JavaScript Libraries Available
-// Available: _, lodash, axios, cheerio, dayjs, moment, dateFns, dateFnsTz,
-//   luxon, DateTime, cronParser, joi, Joi, validator, Ajv, yup, z, zod,
-//   phoneNumber, iban, uuid, nanoid, bytes, ms, qs, slug, pluralize,
-//   xml2js, XMLParser, XMLBuilder, YAML, papaparse, Papa, ini, toml,
-//   jmespath, jsonDiff, Handlebars, htmlToText, marked, cheerio, franc,
-//   compromise, fuzzy, stringSimilarity, pRetry, FormData,
-//   CryptoJS, forge, jwt, bcrypt, bcryptjs, nodeCrypto, secp256k1, bip39,
-//   XLSX, xlsx, ExcelJS, JSZip, pako, QRCode, exifr,
-//   Jimp, jimp, imageSize, JPEG, PNG,
-//   ffmpeg, ffmpegStatic, ffprobeStatic,
-//   web3, ccxt, coinGecko, solana, bitcoin, ytdl,
-//   axios, FormData, utils
+const DEFAULT_JS = `// Code Pro — JS + 70+ libs (_, axios, dayjs, uuid, zod, cheerio, …)
+// Inventory: utils.getRegisteredLibraries() / utils.getCodeProVersion()
+//
+// Mode: multi-item returns need "Run Once for All Items".
+// Each-item: return ONE object (or a 1-element array).
+// $input.all() = FULL input list in both modes (stock Code semantics).
 
-// 🔄 EXECUTION MODE SUPPORT:
-// - "Run Once for All Items": Access all items via $input.all() or items variable
-// - "Run Once for Each Item": Access current item via $input.item or item variable
+const rows = $input.all().map((i) => i.json);
 
-// For "Run Once for All Items" mode:
-if (typeof items !== 'undefined') {
-    console.log('Running in "Run Once for All Items" mode');
-    console.log('Total items:', items.length);
-    // Process all items together
-    const allData = items.map(item => item.json);
-    return items.map((item, index) => ({
-        json: {
-            ...item.json,
-            id: uuid.v4(),
-            at: dayjs().toISOString(),
-            result: 'Processed all items together'
-        },
-        pairedItem: { item: index },
-    }));
-}
-
-// For "Run Once for Each Item" mode:
-if (typeof item !== 'undefined') {
-    console.log('Running in "Run Once for Each Item" mode');
-    console.log('Current item:', item.json);
-    // Process single item
-    return {
-        json: {
-            ...item.json,
-            id: uuid.v4(),
-            at: dayjs().toISOString(),
-            result: 'Processed individual item'
-        },
-    };
-}
-
-// Fallback
-const data = $input.first().json;
-return {
-    json: {
-        result: 'Hello from Code Pro!',
-        fallback: true,
-        ...data
-    },
-};
+return rows.map((row, index) => ({
+  json: {
+    ...row,
+    id: uuid.v4(),
+    at: dayjs().toISOString(),
+  },
+  pairedItem: { item: index },
+}));
 `;
 
 export class CodePro implements INodeType {
@@ -88,7 +44,7 @@ export class CodePro implements INodeType {
 		group: ['transform'],
 		version: 1,
 		description:
-			'Run JavaScript with stock Code-compatible modes/helpers and 70+ built-in automation libraries (data, image, video tooling)',
+			'Run JavaScript with stock Code-compatible modes/helpers and 70+ built-in automation libraries (data, image, video tooling). Build identity: utils.getCodeProVersion()',
 		defaults: {
 			name: 'Code Pro',
 		},
@@ -136,8 +92,8 @@ export class CodePro implements INodeType {
 				name: 'jsCode',
 				type: 'string',
 				typeOptions: {
-					editor: 'codeNodeEditor',
-					editorLanguage: 'javaScript',
+					// jsEditor: larger monospaced feel in the NDV than codeNodeEditor
+					editor: 'jsEditor',
 				},
 				default: DEFAULT_JS,
 				description:
@@ -179,7 +135,7 @@ export class CodePro implements INodeType {
 			},
 			{
 				displayName:
-					'<b>Mode:</b> multi-item scripts (e.g. sitemap fetch loops) need <b>Run Once for All Items</b>. Each-item accepts one object or a 1-element array. Flat objects without <code>json:</code> are auto-wrapped. Long HTTP loops: raise <b>Options → Timeout</b> (default 60s; sequential 8s axios retries can exceed it). Inventory: <code>utils.getAvailableLibraries()</code>.',
+					'<b>Mode:</b> multi-item batch scripts need <b>Run Once for All Items</b>. Each-item: one object (or 1-element array). <code>$input.all()</code> is the <b>full</b> input list in both modes (stock Code). Flat objects without <code>json:</code> auto-wrap. Long HTTP: raise <b>Timeout</b> (default 60s). Version: <code>utils.getCodeProVersion()</code>. Libs: <code>utils.getAvailableLibraries()</code>.',
 				name: 'notice',
 				type: 'notice',
 				default: '',

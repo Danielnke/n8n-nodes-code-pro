@@ -1,5 +1,5 @@
 /**
- * Functional tests for every SuperCode-parity inject + extras.
+ * Functional tests for core inject names + extras.
  * Not just require() — exercises a real API call on each global.
  * Run: npm run build && node scripts/functional-lib-test.js
  */
@@ -7,7 +7,8 @@ const { createContext, runInContext } = require('node:vm');
 const path = require('path');
 const reg = require(path.join(__dirname, '..', 'dist', 'src', 'libraryRegistry.js'));
 
-const SUPERCODE_INJECTS = [
+/** Baseline inject names expected present (parity set + common aliases). */
+const BASELINE_INJECTS = [
 	'_',
 	'lodash',
 	'axios',
@@ -233,12 +234,12 @@ async function main() {
 	const { globals, loaded, failed } = reg.loadLibraryGlobals();
 	console.log('Registry loaded injects:', loaded.length, 'failed stubs:', failed.length);
 
-	const missingSupercode = SUPERCODE_INJECTS.filter((n) => !(n in globals));
-	console.log('\n=== SuperCode inject coverage ===');
-	console.log('SuperCode names:', SUPERCODE_INJECTS.length);
-	console.log('Missing from Code Pro globals:', missingSupercode.length ? missingSupercode.join(', ') : 'none');
+	const missingBaseline = BASELINE_INJECTS.filter((n) => !(n in globals));
+	console.log('\n=== Baseline inject coverage ===');
+	console.log('Baseline names:', BASELINE_INJECTS.length);
+	console.log('Missing from Code Pro globals:', missingBaseline.length ? missingBaseline.join(', ') : 'none');
 
-	const names = [...new Set([...SUPERCODE_INJECTS, ...Object.keys(TESTS)])];
+	const names = [...new Set([...BASELINE_INJECTS, ...Object.keys(TESTS)])];
 	const results = [];
 	for (const name of names) {
 		const r = await runOne(name, globals);
@@ -263,12 +264,12 @@ async function main() {
 		for (const f of missing) console.log(`  - ${f.name}`);
 	}
 
-	// SuperCode subset stats
-	const sc = results.filter((r) => SUPERCODE_INJECTS.includes(r.name));
-	const scPass = sc.filter((r) => r.status === 'PASS').length;
-	console.log(`\nSuperCode-parity functional: ${scPass}/${SUPERCODE_INJECTS.length} PASS`);
+	// Baseline subset stats
+	const baseline = results.filter((r) => BASELINE_INJECTS.includes(r.name));
+	const baselinePass = baseline.filter((r) => r.status === 'PASS').length;
+	console.log(`\nBaseline functional: ${baselinePass}/${BASELINE_INJECTS.length} PASS`);
 
-	if (fail.length || missingSupercode.length) process.exitCode = 1;
+	if (fail.length || missingBaseline.length) process.exitCode = 1;
 }
 
 main().catch((e) => {

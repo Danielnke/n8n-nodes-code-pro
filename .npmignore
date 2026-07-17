@@ -10,6 +10,7 @@ package-lock.json
 AGENTS.md
 PROJECT_PLAN.md
 TECH_SPECS.md
+FAILURE_ANALYSIS.md
 SESSION_BOOTSTRAP.md
 
 # Dev / VCS / env

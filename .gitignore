@@ -12,8 +12,9 @@ Thumbs.db
 *.tsbuildinfo
 
 # Internal docs — keep local only (not public git / not npm)
-# Competitor research, roadmaps, agent rules live here only.
+# Competitor research, roadmaps, agent rules live HERE ONLY — never in src/nodes/scripts/README.
 AGENTS.md
 PROJECT_PLAN.md
 TECH_SPECS.md
+FAILURE_ANALYSIS.md
 SESSION_BOOTSTRAP.md

@@ -1,5 +1,5 @@
 /**
- * Reproduce SuperCode "Fetch Sitemap XML" under Code Pro executor.
+ * Reproduce sitemap-fetch style user code under Code Pro executor.
  */
 const { runUserCode } = require('../dist/src/executeUserCode');
 const {
@@ -8,7 +8,7 @@ const {
 	CodeProValidationError,
 } = require('../dist/src/resultValidation');
 
-const code = `// SuperCode Node: "Fetch Sitemap XML"
+const code = `// Code Pro: "Fetch Sitemap XML"
 const FETCH_TIMEOUT = 8000;
 
 const BROWSER_HEADERS = {
@@ -164,7 +164,7 @@ async function main() {
 		console.error(e.stack);
 	}
 
-	console.log('\n=== runOnceForEachItem (common SuperCode default mismatch) ===');
+	console.log('\n=== runOnceForEachItem (multi-return mode mismatch check) ===');
 	try {
 		const raw = await runUserCode({
 			code,
