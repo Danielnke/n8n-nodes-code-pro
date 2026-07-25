@@ -9,7 +9,8 @@
  * - installLibrariesOnSandbox.ts  — A-lite materialize onto sandbox
  * - buildSandbox.ts               — assemble context
  * - vmWrapper.ts                  — async function wrapper string
- * - enhanceErrors.ts              — Syntax/Reference/TypeError hints
+ * - enhanceErrors.ts              — Syntax/Reference/TypeError / timeout hints
+ * - executionContext.ts           — AsyncLocalStorage AbortSignal for helpers
  * - runUserCode.ts                — main entry
  */
 
@@ -20,5 +21,20 @@ export { createRestrictedRequire } from './restrictedRequire';
 export { installLibraryGlobalsOnSandbox } from './installLibrariesOnSandbox';
 export { buildSandbox } from './buildSandbox';
 export { createVmExecutableCode } from './vmWrapper';
-export { enhanceExecutionError } from './enhanceErrors';
+export {
+	enhanceExecutionError,
+	isTimeoutError,
+	getTimeoutErrorMeta,
+} from './enhanceErrors';
+export {
+	runWithExecutionContext,
+	getExecutionContext,
+	getExecutionAbortSignal,
+} from './executionContext';
+export {
+	coerceTimeoutSec,
+	normalizeTimeoutPolicy,
+	MAX_SOFT_TIMEOUT_SEC,
+	SYNC_VM_TIMEOUT_MS,
+} from './timeoutPolicy';
 export { runUserCode } from './runUserCode';

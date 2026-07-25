@@ -6,6 +6,7 @@ import { mapPool } from '../mapPool';
 import { detectKind } from './detect';
 import { fetchSitemapXml } from './http';
 import { parseSitemapXml } from './parse';
+import { resolveSitemapSignal } from './signal';
 import type {
 	AttemptReason,
 	AxiosLike,
@@ -37,6 +38,7 @@ export async function expandSitemap(
 	const concurrency = options.concurrency ?? 4;
 	const timeoutMs = options.timeoutMs ?? 8000;
 	const includeMetadata = options.includeMetadata === true;
+	const signal = resolveSitemapSignal(options.signal);
 
 	const normalized: ExpandInput =
 		typeof input === 'string' ? { source: input, isXml: false } : input;
@@ -73,14 +75,14 @@ export async function expandSitemap(
 
 	async function loadXml(item: QueueItem): Promise<string | null> {
 		if (item.xml) return item.xml;
-		if (options.signal?.aborted) {
+		if (signal?.aborted) {
 			errors.push({ url: item.url, reason: 'aborted', message: 'aborted' });
 			return null;
 		}
 		const r = await fetchSitemapXml(axios, item.url, {
 			timeoutMs,
 			headers: options.headers,
-			signal: options.signal,
+			signal,
 		});
 		if (!r.ok || !r.text) {
 			errors.push({
@@ -95,7 +97,7 @@ export async function expandSitemap(
 
 	while (queue.length > 0) {
 		if (truncated) break;
-		if (options.signal?.aborted) {
+		if (signal?.aborted) {
 			truncated = true;
 			break;
 		}

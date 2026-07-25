@@ -4,6 +4,7 @@
 
 import { gunzipSync } from 'node:zlib';
 import { looksLikeXml, stripBom, suggestsGzip } from './detect';
+import { resolveSitemapSignal } from './signal';
 import type { AttemptReason, AxiosLike } from './types';
 
 export const DEFAULT_BROWSER_HEADERS: Record<string, string> = {
@@ -149,6 +150,7 @@ export async function fetchSitemapXml(
 	const timeoutMs = options.timeoutMs ?? 8000;
 	const headers = { ...DEFAULT_BROWSER_HEADERS, ...options.headers };
 	const preferBinary = suggestsGzip(url);
+	const signal = resolveSitemapSignal(options.signal);
 
 	try {
 		const res = await axios.get(url, {
@@ -157,7 +159,7 @@ export async function fetchSitemapXml(
 			responseType: preferBinary ? 'arraybuffer' : 'text',
 			// Accept 2xx and 3xx; reject 4xx/5xx so we can classify
 			validateStatus: (s: number) => s >= 200 && s < 400,
-			signal: options.signal,
+			signal,
 			// Follow redirects (axios default)
 			maxRedirects: 5,
 			// Decompress gzip content-encoding when possible; we still handle .gz files
@@ -222,13 +224,14 @@ export async function fetchText(
 		Accept: 'text/plain,*/*;q=0.8',
 		...options.headers,
 	};
+	const signal = resolveSitemapSignal(options.signal);
 	try {
 		const res = await axios.get(url, {
 			timeout: timeoutMs,
 			headers,
 			responseType: 'text',
 			validateStatus: (s: number) => s >= 200 && s < 400,
-			signal: options.signal,
+			signal,
 			maxRedirects: 5,
 		});
 		const text = typeof res.data === 'string' ? res.data : String(res.data ?? '');

@@ -170,6 +170,103 @@ async function main() {
 		);
 	}
 
+	// Soft timeout fires for long async work
+	{
+		let err;
+		const t0 = Date.now();
+		try {
+			await runUserCode({
+				code: 'await new Promise((r) => setTimeout(r, 5000)); return [{ ok: true }];',
+				items: [{ json: {} }],
+				allItems: [{ json: {} }],
+				itemIndex: 0,
+				mode: 'runOnceForAllItems',
+				timeoutSec: 1,
+				ctx,
+			});
+		} catch (e) {
+			err = e;
+		}
+		const elapsed = Date.now() - t0;
+		ok(
+			'soft timeout rejects long async',
+			err && /soft timeout/i.test(err.message) && elapsed < 4000,
+			err?.message?.slice(0, 100) + ` elapsed=${elapsed}ms`,
+		);
+		const enhanced = enhanceExecutionError(err, 1);
+		ok(
+			'timeout enhance has TimeoutError name / code',
+			enhanced?.name === 'TimeoutError' && enhanced?.code === 'ERR_CODE_PRO_TIMEOUT',
+			enhanced?.name + ' ' + (enhanced?.code || ''),
+		);
+	}
+
+	// timeoutSec 0 = unlimited soft timeout (SuperCode-like for long async)
+	{
+		const raw = await runUserCode({
+			code: 'await new Promise((r) => setTimeout(r, 1500)); return [{ waited: true }];',
+			items: [{ json: {} }],
+			allItems: [{ json: {} }],
+			itemIndex: 0,
+			mode: 'runOnceForAllItems',
+			timeoutSec: 0,
+			ctx,
+		});
+		ok(
+			'unlimited timeout (0) allows long async',
+			Array.isArray(raw) && raw[0]?.waited === true,
+			JSON.stringify(raw),
+		);
+	}
+
+	// String timeoutSec must coerce (not become unlimited)
+	{
+		let err;
+		try {
+			await runUserCode({
+				code: 'await new Promise((r) => setTimeout(r, 5000)); return [{ ok: true }];',
+				items: [{ json: {} }],
+				allItems: [{ json: {} }],
+				itemIndex: 0,
+				mode: 'runOnceForAllItems',
+				timeoutSec: '1',
+				ctx,
+			});
+		} catch (e) {
+			err = e;
+		}
+		ok(
+			'string timeoutSec "1" still soft-timeouts',
+			err && /soft timeout/i.test(err.message),
+			err?.message?.slice(0, 80),
+		);
+	}
+
+	// isTimeoutError must NOT treat generic TimeoutError / random strings as Code Pro timeout
+	{
+		const { isTimeoutError } = require(path.join(root, 'dist/src/executeUserCode'));
+		const fakeName = Object.assign(new Error('upstream failed'), { name: 'TimeoutError' });
+		const fakeMsg = new Error('operation soft timeout please retry');
+		const fakeGeneric = new Error('execution timed out waiting for DB');
+		ok('isTimeoutError rejects bare TimeoutError name', !isTimeoutError(fakeName));
+		ok('isTimeoutError rejects soft timeout substring without Code Pro', !isTimeoutError(fakeMsg));
+		ok('isTimeoutError rejects generic execution timed out', !isTimeoutError(fakeGeneric));
+		const real = Object.assign(new Error('Code Pro soft timeout after 1s'), {
+			code: 'ERR_CODE_PRO_TIMEOUT',
+			name: 'TimeoutError',
+		});
+		ok('isTimeoutError accepts Code Pro soft timeout', isTimeoutError(real));
+	}
+
+	// coerceTimeoutSec matrix
+	{
+		const { coerceTimeoutSec } = require(path.join(root, 'dist/src/executeUserCode'));
+		ok('coerce missing → 0', coerceTimeoutSec(undefined) === 0);
+		ok('coerce "30" → 30', coerceTimeoutSec('30') === 30);
+		ok('coerce -5 → 0', coerceTimeoutSec(-5) === 0);
+		ok('coerce 99999 → 3600', coerceTimeoutSec(99999) === 3600);
+	}
+
 	if (process.env.CODE_PRO_SKIP_NETWORK === '1') {
 		console.log('SKIP axios network (CODE_PRO_SKIP_NETWORK=1)');
 	} else {

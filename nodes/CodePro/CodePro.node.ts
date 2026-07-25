@@ -1,13 +1,21 @@
 import {
 	NodeConnectionTypes,
 	NodeOperationError,
+	type IDataObject,
 	type IExecuteFunctions,
 	type INodeExecutionData,
 	type INodeType,
 	type INodeTypeDescription,
 } from 'n8n-workflow';
 
-import { runUserCode, type CodeProMode } from '../../src/execution';
+import {
+	coerceTimeoutSec,
+	getTimeoutErrorMeta,
+	isTimeoutError,
+	MAX_SOFT_TIMEOUT_SEC,
+	runUserCode,
+	type CodeProMode,
+} from '../../src/execution';
 import {
 	CodeProValidationError,
 	enforceMaxOutputItems,
@@ -48,7 +56,8 @@ const DEFAULT_JS = `// =========================================================
 //   Plain objects { a: 1 } auto-wrap to { json: { a: 1 } } in All Items.
 //   Keep business data under json; set pairedItem when counts differ.
 // OPTIONS
-//   Timeout (default 60s): soft race — does NOT hard-cancel in-flight axios/ffmpeg.
+//   Timeout: 0 = unlimited (wait until code returns; SuperCode-like for long HTTP).
+//            >0 = soft Promise.race + AbortSignal (utils.sitemap HTTP cancels on timeout).
 //   Max Output Items (default 10000): fail-closed if you return more (expand carefully).
 // DEBUG: console.log(...); errors surface as NodeOperationError with hints.
 //
@@ -139,7 +148,7 @@ const DEFAULT_JS = `// =========================================================
 // 2. Multi-site / multi-output -> Mode All Items. Never return N items from each-item.
 // 3. Prefer utils.sitemap.* for sitemaps; utils.mapPool for concurrency limits.
 // 4. Handle HTTP failures; put diagnostics on the item (do not silent-empty without fields).
-// 5. Cap expands (maxUrls); respect Max Output Items and Timeout (raise Timeout for batches).
+// 5. Cap expands (maxUrls); respect Max Output Items. Timeout 0 = unlimited for long sitemaps.
 // 6. Put fields under json; set pairedItem when input/output counts differ.
 // 7. Keep scripts complete (no truncated braces) — incomplete paste -> SyntaxError.
 // 8. Prefer dayjs / uuid / _ for light transforms; load heavy libs only when required.
@@ -264,12 +273,14 @@ export class CodePro implements INodeType {
 						name: 'timeout',
 						type: 'number',
 						typeOptions: {
-							minValue: 1,
-							maxValue: 300,
+							minValue: 0,
+							maxValue: MAX_SOFT_TIMEOUT_SEC,
 						},
-						default: 60,
+						// 0 = unlimited soft timeout (async HTTP can run until completion).
+						// Recommended for multi-site sitemap discovery / large expands.
+						default: 0,
 						description:
-							'Soft timeout in seconds (sync VM + Promise.race). Raise for sequential HTTP (sitemaps, retries) or media jobs. Does not hard-kill in-flight axios/ffmpeg',
+							'Soft timeout in seconds (per invocation — each-item mode gets a full budget per item). 0 = unlimited soft race (wait until the code returns — best for sitemaps / long HTTP). >0 races the script and aborts utils.sitemap HTTP via AbortSignal. Sync infinite loops still hit a ~60s VM guard. Plain axios without signal may linger briefly after a soft timeout. Max 3600.',
 					},
 					{
 						displayName: 'Max Output Items',
@@ -287,7 +298,7 @@ export class CodePro implements INodeType {
 			},
 			{
 				displayName:
-					'<b>Mode:</b> multi-item batch → <b>Run Once for All Items</b>. Each-item: one object (or 1-el array). <code>$input.all()</code> is the full list (stock). Sitemaps: <code>utils.sitemap.find</code> / <code>fromWebsite</code> / <code>fromWebsites</code> (expand opt-in; watch Max Output Items). Long HTTP: raise <b>Timeout</b> (default 60s). Default JS is an AI capability guide — full inject list + recipes. Version: <code>utils.getCodeProVersion()</code>.',
+					'<b>Mode:</b> multi-item batch → <b>Run Once for All Items</b>. Each-item: one object (or 1-el array). <code>$input.all()</code> is the full list (stock). Sitemaps: <code>utils.sitemap.find</code> / <code>fromWebsite</code> / <code>fromWebsites</code> (expand opt-in; watch Max Output Items). <b>Timeout</b> default <b>0</b> = unlimited (long HTTP/sitemaps); set a positive value only if you want a hard soft-cap. Version: <code>utils.getCodeProVersion()</code>.',
 				name: 'notice',
 				type: 'notice',
 				default: '',
@@ -303,7 +314,8 @@ export class CodePro implements INodeType {
 			timeout?: number;
 			maxOutputItems?: number;
 		};
-		const timeout = options.timeout ?? 60;
+		// 0 = unlimited soft timeout (default). Shared coerce with runUserCode.
+		const timeout = coerceTimeoutSec(options.timeout);
 		const maxOutputItems = options.maxOutputItems ?? 10_000;
 
 		if (!code?.trim()) {
@@ -348,14 +360,13 @@ export class CodePro implements INodeType {
 							throw error;
 						}
 						if (this.continueOnFail()) {
-							const message = error instanceof Error ? error.message : String(error);
 							returnData.push({
-								json: { error: message },
+								json: continueOnFailPayload(error, timeout),
 								pairedItem: { item: i },
 							});
 							continue;
 						}
-						throw wrapError(this, error, i);
+						throw wrapError(this, error, i, timeout);
 					}
 				}
 
@@ -385,15 +396,38 @@ export class CodePro implements INodeType {
 				throw error;
 			}
 			if (this.continueOnFail() && mode === 'runOnceForAllItems') {
-				const message = error instanceof Error ? error.message : String(error);
-				return [[{ json: { error: message }, pairedItem: { item: 0 } }]];
+				return [[{ json: continueOnFailPayload(error, timeout), pairedItem: { item: 0 } }]];
 			}
-			throw wrapError(this, error);
+			throw wrapError(this, error, undefined, timeout);
 		}
 	}
 }
 
-function wrapError(ctx: IExecuteFunctions, error: unknown, itemIndex?: number): NodeOperationError {
+/** Structured item payload when continueOnFail is enabled. */
+function continueOnFailPayload(error: unknown, timeoutSec: number): IDataObject {
+	const message = error instanceof Error ? error.message : String(error);
+	if (isTimeoutError(error)) {
+		const meta = getTimeoutErrorMeta(timeoutSec);
+		return {
+			error: message,
+			errorCode: meta.errorCode,
+			timeoutSec: meta.timeoutSec,
+			hint: meta.description,
+		};
+	}
+	const err = error as Error & { errorCode?: string };
+	return {
+		error: message,
+		errorCode: err.errorCode ?? 'EXECUTION_ERROR',
+	};
+}
+
+function wrapError(
+	ctx: IExecuteFunctions,
+	error: unknown,
+	itemIndex?: number,
+	timeoutSec = 0,
+): NodeOperationError {
 	if (error instanceof NodeOperationError) {
 		return error;
 	}
@@ -406,6 +440,19 @@ function wrapError(ctx: IExecuteFunctions, error: unknown, itemIndex?: number): 
 	}
 
 	const message = error instanceof Error ? error.message : String(error);
+
+	if (isTimeoutError(error)) {
+		const meta = getTimeoutErrorMeta(timeoutSec);
+		// Avoid double "Code Pro …" prefix when message is already our timeout text
+		const display = message.startsWith('Code Pro ')
+			? message
+			: `Code Pro execution failed: ${message}`;
+		return new NodeOperationError(ctx.getNode(), display, {
+			description: meta.description,
+			itemIndex,
+		});
+	}
+
 	return new NodeOperationError(ctx.getNode(), `Code Pro execution failed: ${message}`, {
 		itemIndex,
 	});

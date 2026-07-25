@@ -8,6 +8,7 @@ import { fetchSitemapXml, fetchText } from './http';
 import { normalizeBase, resolveSitemapUrl } from './normalize';
 import { DEFAULT_SITEMAP_PATHS } from './paths';
 import { parseRobotsSitemaps } from './robots';
+import { resolveSitemapSignal } from './signal';
 import type {
 	AxiosLike,
 	SitemapAttempt,
@@ -23,6 +24,7 @@ async function tryCandidates(
 ): Promise<{ sourceUrl: string; rawXml: string } | null> {
 	const concurrency = options.concurrency ?? 4;
 	const timeoutMs = options.timeoutMs ?? 8000;
+	const signal = resolveSitemapSignal(options.signal);
 
 	// Parallel probes but stop early once we have a winner (best-effort).
 	// We still record all settled attempts for diagnostics.
@@ -32,10 +34,10 @@ async function tryCandidates(
 	const waveSize = Math.max(1, concurrency);
 	for (let i = 0; i < candidates.length; i += waveSize) {
 		if (winner) break;
-		if (options.signal?.aborted) break;
+		if (signal?.aborted) break;
 		const wave = candidates.slice(i, i + waveSize);
 		const results = await mapPool(wave, wave.length, async (url) => {
-			if (options.signal?.aborted) {
+			if (signal?.aborted) {
 				return {
 					url,
 					ok: false as const,
@@ -48,7 +50,7 @@ async function tryCandidates(
 			const r = await fetchSitemapXml(axios, url, {
 				timeoutMs,
 				headers: options.headers,
-				signal: options.signal,
+				signal,
 			});
 			return r;
 		});
@@ -104,11 +106,12 @@ export async function findSitemap(
 	}
 
 	// 1) robots.txt
+	const signal = resolveSitemapSignal(options.signal);
 	const robotsUrl = `${base}/robots.txt`;
 	const robotsRes = await fetchText(axios, robotsUrl, {
 		timeoutMs: options.timeoutMs ?? 8000,
 		headers: options.headers,
-		signal: options.signal,
+		signal,
 	});
 	attempts.push({
 		url: robotsUrl,

@@ -60,7 +60,7 @@ Mark all that apply after probes below:
 
 ## 3. Probes (copy-paste into Code Pro)
 
-Use **Run Once for All Items** unless noted. Timeout ≥ 60s for HTTP probes.
+Use **Run Once for All Items** unless noted. Options → **Timeout = 0** (unlimited, default) for HTTP/sitemap probes; set a positive value only when testing soft-timeout cancellation.
 
 ### Probe 1 — identity (L0/L1)
 
@@ -112,7 +112,7 @@ return [{ json: { status: r.status, len: String(r.data).length } }];
 
 ### Probe 4 — `utils.sitemap` engine OK (L2/L5/L6)
 
-Mode: **All Items**. Timeout ≥ 60s. Input: `{ "website": "example.com" }` (or a known-good host).
+Mode: **All Items**. Timeout = 0 (unlimited, default). Input: `{ "website": "example.com" }` (or a known-good host).
 
 ```javascript
 const website = $json.website || $json.Website || 'example.com';

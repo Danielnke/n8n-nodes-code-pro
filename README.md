@@ -195,7 +195,7 @@ Restart n8n. Palette: **Code Pro**.
 |---|---|
 | **Mode** | Run Once for All Items / Run Once for Each Item |
 | **JavaScript** | Your script (`jsCode`); libraries are globals |
-| **Options → Timeout** | Soft timeout seconds (default **60**). Does not hard-kill async HTTP/ffmpeg |
+| **Options → Timeout** | Soft timeout seconds. **0 = unlimited** (default; wait until code returns). `>0` races the script and aborts `utils.sitemap` HTTP via AbortSignal |
 | **Options → Max Output Items** | Fail if more items returned (default 10 000); not bypassed by continueOnFail |
 
 **Return shape:** all-items → `[{ json: { ... } }, ...]`; each-item → single `{ json: { ... } }`. Prefer `pairedItem` when counts differ.
@@ -216,27 +216,30 @@ First-party helpers for **sitemap-heavy** jobs: discover XML via `robots.txt` + 
 
 **Defaults that matter:** expand is **opt-in** (`expand: true`). Expanded `urls` are **strings** unless `includeMetadata: true`. `rawXml` is dropped when expanding (set `includeRawXml: true` to keep it). Caps default to `maxDepth: 3`, `maxSitemaps: 50`, `maxUrls: 10000`.
 
-### A) One item per site (discovery)
+### A) One item per site (discover + fetch raw XML)
 
 ```js
-// Mode: Run Once for All Items — raise Timeout for many sites
+// Mode: Run Once for All Items
+// Options → Timeout: 0 (unlimited, default) for multi-site batches that may take minutes
+// Returns website, sourceUrl, rawXml, found — ready for a downstream parse/rank node
 const sites = $input.all().map((i) => i.json.website || i.json.Website);
 const results = await utils.sitemap.fromWebsites(sites, {
-  expand: false,
+  expand: false,           // discovery only — keep rawXml
+  includeRawXml: true,
   websiteConcurrency: 3,
   concurrency: 4,
-  timeoutMs: 8000,
+  timeoutMs: 8000, // per-request HTTP only (not the whole node)
 });
 return results.map((r, index) => ({
   json: {
     website: r.website,
     found: r.found,
     sourceUrl: r.sourceUrl,
+    rawXml: r.rawXml, // full sitemap body (can be large)
     kind: r.kind,
     robotsSitemaps: r.robotsSitemaps,
-    hasXml: !!r.rawXml,
-    // attempts[] explains found:false (not_xml, http_403, timeout, …)
-    attempts: r.attempts,
+    // attempts[] explains found:false (not_xml, http_error, timeout, network, …)
+    attempts: r.found ? undefined : r.attempts,
   },
   pairedItem: { item: index },
 }));
@@ -264,7 +267,8 @@ return r.urls.map((loc) => ({
 **Tips**
 
 - Prefer **All Items** for multi-site batches.
-- Raise **Timeout** (e.g. 90–120s) for large expand / many hosts. Soft timeout does not hard-cancel in-flight axios.
+- **Timeout 0 (default)** waits until the script returns — use this for slow sites / large expands. Set a positive Timeout only if you want a hard soft-cap; sitemap HTTP then cancels via AbortSignal.
+- `timeoutMs` on `utils.sitemap.*` is **per HTTP request**, not the whole node run.
 - Large expands can hit **Max Output Items** — lower `maxUrls` or batch.
 - Example workflow: `examples/code-pro-sitemap.json`
 - Offline tests: `npm run test:sitemap`
