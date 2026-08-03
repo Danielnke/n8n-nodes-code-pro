@@ -16,6 +16,10 @@ const {
 } = require(path.join(root, 'dist/src/utils/sitemap'));
 const { mapPool } = require(path.join(root, 'dist/src/utils/mapPool'));
 const {
+	fetchSitemapXml,
+	fetchText,
+} = require(path.join(root, 'dist/src/utils/sitemap/http'));
+const {
 	getLibraryGlobals,
 	clearLibraryCache,
 } = require(path.join(root, 'dist/src/libraryRegistry'));
@@ -105,6 +109,8 @@ async function main() {
 		'normalizeBase strips path',
 		normalizeBase('https://example.com/foo/bar') === 'https://example.com',
 	);
+	ok('normalizeBase rejects invalid URL', normalizeBase('not a url') === '');
+	ok('normalizeBase rejects malformed host', normalizeBase('https://%') === '');
 	ok('looksLikeXml urlset', looksLikeXml(URLSET) === true);
 	ok('looksLikeXml html false', looksLikeXml('<!DOCTYPE html><html></html>') === false);
 	ok('detectKind urlset', detectKind(URLSET) === 'urlset');
@@ -172,6 +178,76 @@ Sitemap: https://cdn.example.com/news-sitemap.xml
 	const axios = mockAxios(routes);
 	const sitemap = createSitemapHelpers({ getAxios: () => axios });
 
+	let invalidCalls = 0;
+	const invalidHelpers = createSitemapHelpers({
+		getAxios: () => ({
+			async get() {
+				invalidCalls++;
+				throw new Error('should not be called');
+			},
+		}),
+	});
+	const invalidSite = await invalidHelpers.find('not a url');
+	ok(
+		'invalid website does not make HTTP requests',
+		invalidSite.found === false && invalidCalls === 0,
+		JSON.stringify(invalidSite),
+	);
+
+	let capturedConfig;
+	const oversizedAxios = {
+		async get(_url, config) {
+			capturedConfig = config;
+			return {
+				status: 200,
+				data: URLSET + ' '.repeat(256),
+				headers: { 'content-type': 'application/xml' },
+			};
+		},
+	};
+	const oversized = await fetchSitemapXml(oversizedAxios, 'https://large.test/sitemap.xml', {
+		maxContentBytes: 64,
+	});
+	ok(
+		'plain sitemap byte limit',
+		oversized.reason === 'too_large' && capturedConfig.maxContentLength === 64,
+		JSON.stringify(oversized),
+	);
+
+	const gzBomb = zlib.gzipSync(Buffer.from(URLSET + ' '.repeat(4096), 'utf8'));
+	const gzipLimited = await fetchSitemapXml(
+		mockAxios({
+			'https://large.test/sitemap.xml.gz': {
+				data: gzBomb,
+				headers: { 'content-type': 'application/gzip' },
+			},
+		}),
+		'https://large.test/sitemap.xml.gz',
+		{ maxContentBytes: 512 },
+	);
+	ok('gzip inflated byte limit', gzipLimited.reason === 'too_large', JSON.stringify(gzipLimited));
+
+	const genericXml = await fetchSitemapXml(
+		mockAxios({
+			'https://generic.test/feed.xml': {
+				data: '<?xml version="1.0"?><feed><item>not a sitemap</item></feed>',
+			},
+		}),
+		'https://generic.test/feed.xml',
+	);
+	ok('generic XML is not a sitemap', genericXml.reason === 'not_xml', JSON.stringify(genericXml));
+
+	const robotsLimited = await fetchText(
+		{
+			async get() {
+				return { status: 200, data: 'x'.repeat(128), headers: {} };
+			},
+		},
+		'https://large.test/robots.txt',
+		{ maxContentBytes: 64 },
+	);
+	ok('robots byte limit', robotsLimited.reason === 'too_large', JSON.stringify(robotsLimited));
+
 	const found = await sitemap.find('example.com', { concurrency: 4, timeoutMs: 2000 });
 	ok(
 		'find via robots',
@@ -202,6 +278,16 @@ Sitemap: https://cdn.example.com/news-sitemap.xml
 			expanded.sitemapsVisited.length >= 1 &&
 			expanded.truncated === false,
 		JSON.stringify(expanded),
+	);
+
+	const zeroConcurrency = await sitemap.expand(
+		'https://example.com/sitemap-pages.xml',
+		{ concurrency: 0 },
+	);
+	ok(
+		'expand clamps zero concurrency',
+		zeroConcurrency.urls.length === 2,
+		JSON.stringify(zeroConcurrency),
 	);
 
 	const meta = await sitemap.expand('https://example.com/sitemap-pages.xml', {

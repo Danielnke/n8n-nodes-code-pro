@@ -1,7 +1,7 @@
 {
   "name": "n8n-nodes-code-pro",
-  "version": "0.4.3",
-  "description": "Code Pro — JavaScript Code node for n8n with stock-compatible execution and 70+ built-in automation libraries (data, image, video tooling)",
+  "version": "0.5.0",
+  "description": "Run trusted JavaScript in self-hosted n8n with stock-compatible helpers, bounded execution controls, and 74 built-in automation globals",
   "keywords": [
     "n8n-community-node-package",
     "n8n",
@@ -27,7 +27,7 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.22.0"
   },
   "main": "dist/nodes/CodePro/CodePro.node.js",
   "scripts": {
@@ -39,19 +39,25 @@
     "test:golden": "node scripts/golden-port.js",
     "test:sitemap": "node scripts/test-sitemap.js",
     "verify:n8n-sim": "node scripts/verify-n8n-sim.js",
-    "repro:sitemap": "node scripts/repro-sitemap.js"
+    "repro:sitemap": "node scripts/repro-sitemap.js",
+    "prepublishOnly": "npm run verify",
+    "verify": "npm run lint && npm run build && npm run test:golden && npm run test:sitemap && npm run verify:n8n-sim && npm run smoke:libs && npm run test:libs",
+    "prepack": "npm run build"
   },
   "files": [
     "dist",
+    "examples",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [],
     "nodes": [
       "dist/nodes/CodePro/CodePro.node.js"
-    ]
+    ],
+    "strict": true
   },
   "dependencies": {
     "@distube/ytdl-core": "^4.15.1",
@@ -74,11 +80,10 @@
     "dayjs": "^1.11.10",
     "exceljs": "^4.4.0",
     "exifr": "^7.1.3",
-    "fast-xml-parser": "^4.5.0",
+    "fast-xml-parser": "5.10.1",
     "ffmpeg-static": "^5.2.0",
-    "ffprobe-static": "^3.1.0",
     "fluent-ffmpeg": "^2.1.2",
-    "form-data": "^4.0.0",
+    "form-data": "4.0.6",
     "franc-min": "^6.2.0",
     "fuse.js": "^7.0.0",
     "handlebars": "^4.7.8",
@@ -86,7 +91,7 @@
     "iban": "^0.0.14",
     "image-size": "^1.2.1",
     "ini": "^4.1.1",
-    "jimp": "^0.22.12",
+    "jimp": "1.6.1",
     "jmespath": "^0.16.0",
     "joi": "^17.11.0",
     "jpeg-js": "^0.4.4",
@@ -111,10 +116,9 @@
     "slug": "^8.2.3",
     "string-similarity": "^4.0.4",
     "toml": "^3.0.0",
-    "uuid": "^9.0.1",
+    "uuid": "11.1.1",
     "validator": "^13.11.0",
     "web3": "^4.16.0",
-    "xlsx": "^0.18.5",
     "xml2js": "^0.6.2",
     "yaml": "^2.5.0",
     "yup": "^1.4.0",
@@ -127,15 +131,21 @@
     "@types/crypto-js": "^4.2.2",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/lodash": "^4.17.0",
-    "@types/node": "^20.0.0",
+    "@types/node": "22.0.0",
     "@types/papaparse": "^5.3.15",
     "@types/pluralize": "^0.0.33",
     "@types/qrcode": "^1.5.5",
     "@types/qs": "^6.9.17",
     "@types/string-similarity": "^4.0.2",
-    "@types/uuid": "^9.0.8",
     "@types/validator": "^13.12.2",
     "n8n-workflow": "^1.0.0",
     "typescript": "^5.9.0"
+  },
+  "overrides": {
+    "brace-expansion@<1.1.17": "1.1.17",
+    "brace-expansion@>=2.0.0 <2.1.3": "2.1.3",
+    "fast-uri@<=3.1.3": "3.1.4",
+    "form-data@<4.0.6": "4.0.6",
+    "uuid@<11.1.1": "11.1.1"
   }
 }

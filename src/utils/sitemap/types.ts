@@ -13,6 +13,7 @@ export type AttemptReason =
 	| 'empty'
 	| 'aborted'
 	| 'gzip_error'
+	| 'too_large'
 	| 'parse_error'
 	| 'unknown';
 
@@ -43,6 +44,8 @@ export interface SitemapParseResult {
 
 export interface SitemapFindOptions {
 	timeoutMs?: number;
+	/** Maximum downloaded/inflated bytes per sitemap (hard-capped at 50 MiB). */
+	maxContentBytes?: number;
 	concurrency?: number;
 	/** Extra or full replacement path list (paths starting with /). */
 	paths?: string[];
@@ -69,6 +72,8 @@ export interface SitemapExpandOptions {
 	maxUrls?: number;
 	concurrency?: number;
 	timeoutMs?: number;
+	/** Maximum downloaded/inflated bytes per sitemap (hard-capped at 50 MiB). */
+	maxContentBytes?: number;
 	includeMetadata?: boolean;
 	headers?: Record<string, string>;
 	signal?: AbortSignal;

@@ -10,9 +10,13 @@ import { createConsole } from './consoleBridge';
 import { installLibraryGlobalsOnSandbox } from './installLibrariesOnSandbox';
 import { buildInputHelpers } from './inputHelpers';
 import { createRestrictedRequire } from './restrictedRequire';
+import type { TrackedTimerController } from './trackedTimers';
 import type { RunUserCodeOptions } from './types';
 
-export function buildSandbox(options: RunUserCodeOptions): Context {
+export function buildSandbox(
+	options: RunUserCodeOptions,
+	timers?: TrackedTimerController['globals'],
+): Context {
 	const {
 		items,
 		allItems: allItemsOpt,
@@ -50,7 +54,6 @@ export function buildSandbox(options: RunUserCodeOptions): Context {
 	};
 
 	const libraryGlobals = loadLibraries ? getLibraryGlobals().globals : {};
-	const restrictedRequire = createRestrictedRequire(loadLibraries);
 
 	const sandbox: Record<string, unknown> = {
 		...dataProxy,
@@ -70,12 +73,12 @@ export function buildSandbox(options: RunUserCodeOptions): Context {
 		$getNodeParameter: ctx.getNodeParameter.bind(ctx),
 		console: createConsole(ctx),
 		Buffer,
-		setTimeout,
-		clearTimeout,
-		setInterval,
-		clearInterval,
-		setImmediate,
-		clearImmediate,
+		setTimeout: timers?.setTimeout ?? setTimeout,
+		clearTimeout: timers?.clearTimeout ?? clearTimeout,
+		setInterval: timers?.setInterval ?? setInterval,
+		clearInterval: timers?.clearInterval ?? clearInterval,
+		setImmediate: timers?.setImmediate ?? setImmediate,
+		clearImmediate: timers?.clearImmediate ?? clearImmediate,
 		URL,
 		URLSearchParams,
 		// Host builtins (outer realm) for instanceof / missing-global safety
@@ -102,13 +105,24 @@ export function buildSandbox(options: RunUserCodeOptions): Context {
 		...(typeof AbortController === 'function' ? { AbortController } : {}),
 		...(typeof TextEncoder === 'function' ? { TextEncoder, TextDecoder } : {}),
 		...extraGlobals,
-		require: restrictedRequire,
 	};
 
 	// A-lite materialize: eager values as plain data props; lazy getters re-bind onto *sandbox*
 	if (loadLibraries) {
 		installLibraryGlobalsOnSandbox(sandbox, libraryGlobals);
 	}
+
+	const isolatedRequireInjects: Record<string, string> = {
+		axios: 'axios',
+		lodash: 'lodash',
+		handlebars: 'Handlebars',
+	};
+	sandbox.require = createRestrictedRequire(loadLibraries, (packageName) => {
+		const inject = isolatedRequireInjects[packageName];
+		return inject
+			? { found: true, value: sandbox[inject] }
+			: { found: false };
+	});
 
 	return createContext(sandbox);
 }

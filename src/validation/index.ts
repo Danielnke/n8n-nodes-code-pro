@@ -13,7 +13,11 @@ export {
 
 export {
 	CODE_PRO_MAX_OUTPUT,
+	DEFAULT_MAX_OUTPUT_ITEMS,
+	MAX_OUTPUT_ITEMS_LIMIT,
+	coerceMaxOutputItems,
 	isMaxOutputItemsError,
+	enforceMaxOutputItemCount,
 	enforceMaxOutputItems,
 	maybeAddPairedItemHint,
 } from './outputGuards';

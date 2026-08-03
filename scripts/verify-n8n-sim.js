@@ -94,7 +94,7 @@ return [{
     bytes: out.length,
     hasFfmpeg: typeof ffmpeg === 'function',
     ffPath: typeof ffmpegStatic === 'string',
-    probe: typeof ffprobeStatic === 'string',
+    bundledProbeRemoved: !utils.isLibraryAvailable('ffprobeStatic'),
   },
 }];
 `,

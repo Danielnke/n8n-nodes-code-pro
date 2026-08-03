@@ -5,6 +5,7 @@
 import { getCodeProVersion } from './version';
 import { mapPool } from './mapPool';
 import type { AxiosLike } from './sitemap/types';
+import { getExecutionTimers } from '../execution/executionContext';
 
 export interface RetryOptions {
 	attempts?: number;
@@ -56,15 +57,21 @@ export function createUtilsBag(options: UtilsBagOptions): Record<string, unknown
 		return sitemapHelpers;
 	};
 
+	const sleep = (ms: number) => {
+		const delay = Number.isFinite(ms) ? Math.max(0, ms) : 0;
+		const timers = getExecutionTimers();
+		return new Promise<void>((resolve) => (timers?.setTimeout ?? setTimeout)(resolve, delay));
+	};
+
 	const bag: Record<string, unknown> = {
 		/** Package version of the loaded Code Pro build (for live n8n L1 checks). */
 		getCodeProVersion,
 
-		sleep: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+		sleep,
 
 		retry: async <T>(fn: () => Promise<T> | T, options: RetryOptions = {}): Promise<T> => {
-			const attempts = options.attempts ?? 3;
-			const delay = options.delay ?? 1000;
+			const attempts = Math.max(1, Math.floor(options.attempts ?? 3));
+			const delay = Math.max(0, options.delay ?? 1000);
 			let lastError: unknown;
 			for (let i = 0; i < attempts; i++) {
 				try {
@@ -72,7 +79,7 @@ export function createUtilsBag(options: UtilsBagOptions): Record<string, unknown
 				} catch (error) {
 					lastError = error;
 					if (i < attempts - 1) {
-						await new Promise((r) => setTimeout(r, delay * Math.pow(2, i)));
+						await sleep(delay * Math.pow(2, i));
 					}
 				}
 			}

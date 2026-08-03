@@ -267,6 +267,92 @@ async function main() {
 		ok('coerce 99999 → 3600', coerceTimeoutSec(99999) === 3600);
 	}
 
+	// Invocation-scoped timers are cleaned up after return.
+	{
+		const timerMessages = [];
+		const timerCtx = {
+			...ctx,
+			logger: {
+				info: (message) => timerMessages.push(message),
+				warn() {},
+				error() {},
+			},
+		};
+		const raw = await runUserCode({
+			code: `setTimeout(() => console.log('late-timeout'), 25);
+setInterval(() => console.log('late-interval'), 25);
+await utils.sleep(5);
+return [{ ok: true }];`,
+			items: [{ json: {} }],
+			allItems: [{ json: {} }],
+			itemIndex: 0,
+			mode: 'runOnceForAllItems',
+			timeoutSec: 5,
+			ctx: timerCtx,
+		});
+		await new Promise((resolve) => setTimeout(resolve, 80));
+		ok(
+			'invocation timers cleaned after return',
+			Array.isArray(raw) && raw[0]?.ok === true && timerMessages.length === 0,
+			JSON.stringify(timerMessages),
+		);
+	}
+
+	// Stateful core libraries are isolated between invocations.
+	{
+		await runUserCode({
+			code: `axios.defaults.headers.common['X-Code-Pro-Leak'] = 'secret';
+_.templateSettings.variable = 'leak';
+Handlebars.registerHelper('codeProLeak', () => 'secret');
+return [{ ok: true }];`,
+			items: [{ json: {} }],
+			allItems: [{ json: {} }],
+			itemIndex: 0,
+			mode: 'runOnceForAllItems',
+			timeoutSec: 5,
+			ctx,
+		});
+		const raw = await runUserCode({
+			code: `return [{
+  axiosLeak: axios.defaults.headers.common['X-Code-Pro-Leak'] || null,
+  lodashLeak: _.templateSettings.variable || null,
+  handlebarsLeak: typeof Handlebars.helpers.codeProLeak,
+  requireAxiosIsGlobal: require('axios') === axios,
+}];`,
+			items: [{ json: {} }],
+			allItems: [{ json: {} }],
+			itemIndex: 0,
+			mode: 'runOnceForAllItems',
+			timeoutSec: 5,
+			ctx,
+		});
+		ok(
+			'stateful library facades isolated per invocation',
+			raw[0]?.axiosLeak === null &&
+				raw[0]?.lodashLeak === null &&
+				raw[0]?.handlebarsLeak === 'undefined' &&
+				raw[0]?.requireAxiosIsGlobal === true,
+			JSON.stringify(raw),
+		);
+	}
+
+	// Stock-compatible each-item null skips output.
+	{
+		const skipped = validateRunCodeEachItem(null, 0, ctx.helpers.normalizeItems);
+		ok('each-item null skips output', skipped === undefined);
+	}
+
+	// Tampered output limits fail safe instead of disabling the guard.
+	{
+		const { coerceMaxOutputItems } = require(path.join(
+			root,
+			'dist/src/validation/outputGuards',
+		));
+		ok('output cap invalid -> default', coerceMaxOutputItems(Infinity) === 10000);
+		ok('output cap zero -> default', coerceMaxOutputItems(0) === 10000);
+		ok('output cap clamps maximum', coerceMaxOutputItems(9999999) === 1000000);
+	}
+
 	if (process.env.CODE_PRO_SKIP_NETWORK === '1') {
 		console.log('SKIP axios network (CODE_PRO_SKIP_NETWORK=1)');
 	} else {

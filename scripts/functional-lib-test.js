@@ -34,7 +34,6 @@ const BASELINE_INJECTS = [
 	'jwt',
 	'bcrypt',
 	'bcryptjs',
-	'XLSX',
 	'QRCode',
 	'fuzzy',
 	'stringSimilarity',
@@ -95,7 +94,6 @@ const TESTS = {
 	jwt: '() => { const t = jwt.sign({ a: 1 }, "secret"); return jwt.verify(t, "secret").a === 1; }',
 	bcrypt: '() => typeof bcrypt.hashSync === "function" && bcrypt.compareSync("x", bcrypt.hashSync("x", 4))',
 	bcryptjs: '() => typeof bcryptjs.hashSync === "function"',
-	XLSX: '() => { const wb = XLSX.utils.book_new(); const ws = XLSX.utils.aoa_to_sheet([[1]]); XLSX.utils.book_append_sheet(wb, ws, "s"); return wb.SheetNames[0] === "s"; }',
 	QRCode: '() => typeof QRCode.toDataURL === "function"',
 	fuzzy: '() => { const F = fuzzy; const f = new F(["apple","banana"], { includeScore: true }); return f.search("app").length >= 1; }',
 	stringSimilarity: '() => stringSimilarity.compareTwoStrings("a", "a") === 1',
@@ -140,7 +138,6 @@ const TESTS = {
 	ms: '() => ms("1s") === 1000',
 	XMLBuilder: '() => typeof XMLBuilder === "function"',
 	ExcelJS: '() => typeof ExcelJS.Workbook === "function" || typeof ExcelJS === "function"',
-	xlsx: '() => typeof xlsx.utils === "object"',
 	// Image — real encode/decode ops (not just typeof); uses injected PNG/Jimp/JPEG
 	Jimp: `async () => {
 		const png = new PNG({ width: 4, height: 4 });
@@ -160,6 +157,7 @@ const TESTS = {
 		return true;
 	}`,
 	jimp: '() => typeof jimp.read === "function" || typeof jimp === "function"',
+	JimpMime: '() => JimpMime.png === \"image/png\"',
 	imageSize: `() => {
 		const png = new PNG({ width: 3, height: 5 });
 		png.data = Buffer.alloc(3 * 5 * 4, 10);
@@ -184,8 +182,6 @@ const TESTS = {
 	// Video binaries — must be real existing paths (uses __fs from test sandbox)
 	ffmpegStatic:
 		'() => typeof ffmpegStatic === "string" && ffmpegStatic.length > 0 && __fs.existsSync(ffmpegStatic)',
-	ffprobeStatic:
-		'() => typeof ffprobeStatic === "string" && ffprobeStatic.length > 0 && __fs.existsSync(ffprobeStatic)',
 	ffmpeg: '() => typeof ffmpeg === "function"',
 };
 

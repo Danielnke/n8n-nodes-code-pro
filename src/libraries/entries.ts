@@ -7,6 +7,91 @@ import type { LibraryEntry } from './types';
 import { defaultExport } from './moduleInterop';
 import { safeLoadFfmpegPath, safeLoadFfprobePath } from './safeBinaries';
 
+function adaptJimpInstance(instance: unknown): unknown {
+	if (
+		instance === null ||
+		(typeof instance !== 'object' && typeof instance !== 'function')
+	) {
+		return instance;
+	}
+
+	const image = instance as Record<string, unknown>;
+	if (image.__codeProJimpV1Compat === true) return instance;
+
+	const resize = image.resize;
+	if (typeof resize === 'function') {
+		image.resize = function (
+			this: unknown,
+			first: unknown,
+			second?: unknown,
+		): unknown {
+			if (typeof first === 'number') {
+				const options: { w: number; h?: number } = { w: first };
+				if (typeof second === 'number' && second > 0) options.h = second;
+				return resize.call(this, options);
+			}
+			return resize.call(this, first);
+		};
+	}
+
+	const getBuffer = image.getBuffer;
+	if (typeof getBuffer === 'function' && typeof image.getBufferAsync !== 'function') {
+		image.getBufferAsync = function (
+			this: unknown,
+			type: unknown,
+			options?: unknown,
+		): unknown {
+			return getBuffer.call(this, type, options);
+		};
+	}
+
+	Object.defineProperty(image, '__codeProJimpV1Compat', { value: true });
+	return instance;
+}
+
+function addJimpV0Compatibility(jimp: unknown, mime: unknown): unknown {
+	if (typeof jimp !== 'function') return jimp;
+
+	type JimpConstructor = (new (...args: unknown[]) => unknown) &
+		Record<string, unknown>;
+	const target = jimp as JimpConstructor;
+	const compatible = new Proxy(target, {
+		construct(constructor, args, newTarget) {
+			return adaptJimpInstance(Reflect.construct(constructor, args, newTarget)) as object;
+		},
+		get(constructor, property, receiver) {
+			const value = Reflect.get(constructor, property, receiver);
+			if (property === 'read' && typeof value === 'function') {
+				return async (...args: unknown[]) =>
+					adaptJimpInstance(
+						await (value as (...callArgs: unknown[]) => unknown).apply(
+							constructor,
+							args,
+						),
+					);
+			}
+			return value;
+		},
+	});
+
+	const mimeMap = mime as Record<string, unknown> | undefined;
+	const legacyMimes: Record<string, unknown> = {
+		MIME_PNG: mimeMap?.png,
+		MIME_JPEG: mimeMap?.jpeg,
+		MIME_BMP: mimeMap?.bmp,
+		MIME_TIFF: mimeMap?.tiff,
+		MIME_GIF: mimeMap?.gif,
+		AUTO: -1,
+	};
+	for (const [key, value] of Object.entries(legacyMimes)) {
+		if (compatible[key] === undefined && value !== undefined) {
+			compatible[key] = value;
+		}
+	}
+
+	return compatible;
+}
+
 export const LIBRARY_ENTRIES: LibraryEntry[] = [
 	// --- Default template core (eager, tiny) ---
 	{
@@ -294,16 +379,6 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 
 	// --- Files ---
 	{
-		injects: ['XLSX', 'xlsx'],
-		packageName: 'xlsx',
-		lazy: true,
-		optional: true,
-		resolve: (mod) => {
-			const x = defaultExport(mod) ?? mod;
-			return { XLSX: x, xlsx: x };
-		},
-	},
-	{
 		injects: ['ExcelJS'],
 		packageName: 'exceljs',
 		lazy: true,
@@ -334,13 +409,14 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 
 	// --- Image automation (pure JS preferred; lazy) ---
 	{
-		injects: ['Jimp', 'jimp'],
+		injects: ['Jimp', 'jimp', 'JimpMime'],
 		packageName: 'jimp',
 		lazy: true,
 		optional: true,
 		resolve: (mod) => {
-			const J = defaultExport(mod) ?? mod;
-			return { Jimp: J, jimp: J };
+			const m = mod as { Jimp?: unknown; JimpMime?: unknown };
+			const J = addJimpV0Compatibility(m.Jimp ?? defaultExport(mod), m.JimpMime);
+			return { Jimp: J, jimp: J, JimpMime: m.JimpMime };
 		},
 	},
 	{
@@ -456,22 +532,6 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
 				);
 			}
 			return { ffmpegStatic: p };
-		},
-	},
-	{
-		injects: ['ffprobeStatic'],
-		packageName: 'ffprobe-static',
-		lazy: true,
-		optional: true,
-		resolve: () => {
-			// NEVER require('ffprobe-static') without platform precheck — it can process.exit(1)
-			const p = safeLoadFfprobePath();
-			if (p == null) {
-				throw new Error(
-					'ffprobe-static binary not available for this platform/arch (or package missing). Video metadata via ffprobe will not work.',
-				);
-			}
-			return { ffprobeStatic: p };
 		},
 	},
 ];

@@ -13,6 +13,7 @@ export {
 	isTimeoutError,
 	getTimeoutErrorMeta,
 	getExecutionAbortSignal,
+	getExecutionTimers,
 	getExecutionContext,
 	runWithExecutionContext,
 	coerceTimeoutSec,

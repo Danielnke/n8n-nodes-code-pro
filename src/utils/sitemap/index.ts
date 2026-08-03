@@ -10,6 +10,7 @@ import { normalizeBase } from './normalize';
 import { parseSitemapXml } from './parse';
 import { parseRobotsSitemaps } from './robots';
 import { DEFAULT_SITEMAP_PATHS } from './paths';
+import { clampInteger, MAX_WEBSITE_CONCURRENCY } from './limits';
 import type {
 	AxiosLike,
 	SitemapExpandOptions,
@@ -132,7 +133,12 @@ export function createSitemapHelpers(deps: SitemapHelpersDeps): Record<string, u
 		options: SitemapFromWebsitesOptions = {},
 	): Promise<SitemapFromWebsiteResult[]> {
 		const list = (websites ?? []).map((w) => String(w ?? '').trim());
-		const websiteConcurrency = options.websiteConcurrency ?? options.concurrency ?? 3;
+		const websiteConcurrency = clampInteger(
+			options.websiteConcurrency ?? options.concurrency,
+			3,
+			1,
+			MAX_WEBSITE_CONCURRENCY,
+		);
 		// Per-site discovery concurrency is separate
 		const siteOpts: SitemapFromWebsiteOptions = { ...options };
 		return mapPool(list, websiteConcurrency, async (site) => {

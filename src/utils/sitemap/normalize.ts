@@ -14,12 +14,15 @@ export function normalizeBase(url: string | null | undefined): string {
 	}
 	try {
 		const parsed = new URL(u);
-		// origin is scheme://host[:port] without trailing slash
+		if (
+			(parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
+			!parsed.hostname
+		) {
+			return '';
+		}
 		return parsed.origin;
 	} catch {
-		// Fallback: strip path-ish trailing junk
-		u = u.replace(/\/+$/, '');
-		return u;
+		return '';
 	}
 }
 

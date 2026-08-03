@@ -8,6 +8,7 @@ import { buildSandbox } from './buildSandbox';
 import { enhanceExecutionError } from './enhanceErrors';
 import { runWithExecutionContext } from './executionContext';
 import { normalizeTimeoutPolicy } from './timeoutPolicy';
+import { createTrackedTimerController } from './trackedTimers';
 import type { RunUserCodeOptions } from './types';
 import { createVmExecutableCode } from './vmWrapper';
 
@@ -23,7 +24,8 @@ import { createVmExecutableCode } from './vmWrapper';
  */
 export async function runUserCode(options: RunUserCodeOptions): Promise<unknown> {
 	const { code } = options;
-	const context = buildSandbox(options);
+	const timers = createTrackedTimerController();
+	const context = buildSandbox(options, timers.globals);
 	const executable = createVmExecutableCode(code);
 
 	const { unlimited, timeoutSec, softTimeoutMs, vmTimeoutMs } = normalizeTimeoutPolicy(
@@ -37,6 +39,7 @@ export async function runUserCode(options: RunUserCodeOptions): Promise<unknown>
 		signal: abortController?.signal,
 		timeoutSec,
 		startedAt: Date.now(),
+		timers: timers.globals,
 	};
 
 	return runWithExecutionContext(executionStore, async () => {
@@ -86,6 +89,7 @@ export async function runUserCode(options: RunUserCodeOptions): Promise<unknown>
 			throw enhanceExecutionError(error, timeoutSec);
 		} finally {
 			if (timer !== undefined) clearTimeout(timer);
+			timers.dispose();
 		}
 	});
 }

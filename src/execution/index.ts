@@ -30,6 +30,7 @@ export {
 	runWithExecutionContext,
 	getExecutionContext,
 	getExecutionAbortSignal,
+	getExecutionTimers,
 } from './executionContext';
 export {
 	coerceTimeoutSec,

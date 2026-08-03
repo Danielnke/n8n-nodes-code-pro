@@ -28,7 +28,6 @@ const packages = [
 	'node-forge',
 	'jsonwebtoken',
 	'bcryptjs',
-	'xlsx',
 	'qrcode',
 	'fuse.js',
 	'string-similarity',
@@ -65,7 +64,6 @@ const packages = [
 	'@distube/ytdl-core',
 	'fluent-ffmpeg',
 	'ffmpeg-static',
-	// ffprobe-static bare-require can process.exit on exotic platforms — tested via registry safeLoad
 	'jimp',
 	'image-size',
 	'exifr',

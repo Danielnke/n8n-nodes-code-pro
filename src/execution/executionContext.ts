@@ -7,6 +7,7 @@
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
+import type { TrackedTimerController } from './trackedTimers';
 
 export interface CodeProExecutionStore {
 	/** AbortSignal aborted when Options → Timeout (soft) fires. */
@@ -15,6 +16,8 @@ export interface CodeProExecutionStore {
 	timeoutSec: number;
 	/** Wall-clock start of this invocation (ms). */
 	startedAt: number;
+	/** Invocation-scoped timers used by helpers such as utils.sleep/retry. */
+	timers?: TrackedTimerController['globals'];
 }
 
 const storage = new AsyncLocalStorage<CodeProExecutionStore>();
@@ -40,4 +43,9 @@ export function getExecutionContext(): CodeProExecutionStore | undefined {
  */
 export function getExecutionAbortSignal(): AbortSignal | undefined {
 	return storage.getStore()?.signal;
+}
+
+/** Invocation-scoped timers, or undefined outside runUserCode. */
+export function getExecutionTimers(): TrackedTimerController['globals'] | undefined {
+	return storage.getStore()?.timers;
 }

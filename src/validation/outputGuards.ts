@@ -7,6 +7,14 @@ import { NodeOperationError } from 'n8n-workflow';
 
 /** Marker so continueOnFail cannot swallow output-cap failures via message text alone. */
 export const CODE_PRO_MAX_OUTPUT = 'CODE_PRO_MAX_OUTPUT_ITEMS';
+export const DEFAULT_MAX_OUTPUT_ITEMS = 10_000;
+export const MAX_OUTPUT_ITEMS_LIMIT = 1_000_000;
+
+export function coerceMaxOutputItems(raw: unknown): number {
+	const value = typeof raw === 'number' ? raw : Number(raw);
+	if (!Number.isFinite(value) || value <= 0) return DEFAULT_MAX_OUTPUT_ITEMS;
+	return Math.min(MAX_OUTPUT_ITEMS_LIMIT, Math.max(1, Math.floor(value)));
+}
 
 export function isMaxOutputItemsError(error: unknown): boolean {
 	if (!(error instanceof NodeOperationError)) return false;
@@ -20,28 +28,39 @@ export function isMaxOutputItemsError(error: unknown): boolean {
  * Cap output length to protect memory / runaway maps.
  * Throws if over limit (fail-closed). Never bypass with continueOnFail.
  */
+function throwMaxOutputItems(
+	count: number,
+	limit: number,
+	ctx: IExecuteFunctions,
+): never {
+	const err = new NodeOperationError(
+		ctx.getNode(),
+		'Code Pro produced ' + count + ' items, which exceeds the Max Output Items limit of ' + limit + '.',
+		{
+			description: CODE_PRO_MAX_OUTPUT + ': Reduce returned items, batch, or raise Max Output Items under Options.',
+		},
+	);
+	(err as NodeOperationError & { context?: { codePro?: string } }).context = {
+		codePro: CODE_PRO_MAX_OUTPUT,
+	};
+	throw err;
+}
+
+export function enforceMaxOutputItemCount(
+	count: number,
+	maxOutputItems: unknown,
+	ctx: IExecuteFunctions,
+): void {
+	const limit = coerceMaxOutputItems(maxOutputItems);
+	if (count > limit) throwMaxOutputItems(count, limit, ctx);
+}
+
 export function enforceMaxOutputItems(
 	items: INodeExecutionData[],
-	maxOutputItems: number,
+	maxOutputItems: unknown,
 	ctx: IExecuteFunctions,
 ): INodeExecutionData[] {
-	if (!Number.isFinite(maxOutputItems) || maxOutputItems <= 0) {
-		return items;
-	}
-	if (items.length > maxOutputItems) {
-		const err = new NodeOperationError(
-			ctx.getNode(),
-			`Code Pro produced ${items.length} items, which exceeds the Max Output Items limit of ${maxOutputItems}.`,
-			{
-				description: `${CODE_PRO_MAX_OUTPUT}: Reduce returned items, batch, or raise Max Output Items under Options.`,
-			},
-		);
-		// Extra marker when n8n preserves unknown fields on the error object
-		(err as NodeOperationError & { context?: { codePro?: string } }).context = {
-			codePro: CODE_PRO_MAX_OUTPUT,
-		};
-		throw err;
-	}
+	enforceMaxOutputItemCount(items.length, maxOutputItems, ctx);
 	return items;
 }
 

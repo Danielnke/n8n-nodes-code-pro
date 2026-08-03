@@ -18,6 +18,8 @@ import {
 } from '../../src/execution';
 import {
 	CodeProValidationError,
+	coerceMaxOutputItems,
+	enforceMaxOutputItemCount,
 	enforceMaxOutputItems,
 	isMaxOutputItemsError,
 	maybeAddPairedItemHint,
@@ -33,7 +35,7 @@ import {
  */
 const DEFAULT_JS = `// =============================================================================
 // CODE PRO — AI / AUTHOR GUIDE (read before writing script)
-// Self-hosted n8n community node: JavaScript + 70+ library globals in-process.
+// Self-hosted n8n community node: JavaScript + 74 library globals in-process.
 // No NODE_FUNCTION_ALLOW_EXTERNAL. Heavy libs load on first use (lazy).
 // Runtime: utils.getCodeProVersion() | utils.getRegisteredLibraries()
 //          utils.getAvailableLibraries() | utils.getFailedLibraries()
@@ -49,7 +51,7 @@ const DEFAULT_JS = `// =========================================================
 //   $input.all()     -> full input item list in BOTH modes (not shrunk to current)
 //   $input.first()   -> first item
 //   $input.item      -> current item (each-item mode)
-//   $json / item     -> current item json (each-item); items = all items
+//   $json -> current item json; item -> current full item (each-item only)
 //   $itemIndex       -> current index (each-item)
 // RETURN SHAPE
 //   Prefer: return [{ json: { ... }, pairedItem: { item: index } }, ...]
@@ -67,11 +69,11 @@ const DEFAULT_JS = `// =========================================================
 // papaparse, Papa, xml2js, XMLParser, XMLBuilder, YAML, ini, toml, jmespath, jsonDiff,
 // cheerio, htmlToText, marked, Handlebars, slug, pluralize, fuzzy, stringSimilarity,
 // franc, compromise, CryptoJS, nodeCrypto, forge, jwt, bcrypt, bcryptjs, secp256k1, bip39,
-// axios, FormData, pRetry, XLSX, xlsx, ExcelJS, JSZip, pako, QRCode, Jimp, jimp, imageSize,
-// exifr, JPEG, PNG, ffmpeg, ffmpegStatic, ffprobeStatic, web3, ccxt, coinGecko, solana,
+// axios, FormData, pRetry, ExcelJS, JSZip, pako, QRCode, Jimp, jimp, JimpMime, imageSize,
+// exifr, JPEG, PNG, ffmpeg, ffmpegStatic, web3, ccxt, coinGecko, solana,
 // bitcoin, ytdl
 // First-party on utils: sitemap.*, mapPool, sleep, retry, flatten, isEmail, isUrl,
-//   sanitizeInput, getCodeProVersion, getRegisteredLibraries, getAvailableLibraries,
+//   sanitizeInput (basic cleanup only, NOT XSS protection), getCodeProVersion,
 //   getFailedLibraries, isLibraryAvailable, memoryUsage
 //
 // ### CAPABILITY MAP — what you can do (with idioms)
@@ -131,14 +133,15 @@ const DEFAULT_JS = `// =========================================================
 //   Drop huge rawXml when expanding (default). Watch Max Output Items on URL fan-out.
 //
 // SPREADSHEETS / ARCHIVES / QR
-//   XLSX.read(buf)  XLSX.utils.sheet_to_json(sheet)  XLSX.write / writeFile
-//   new ExcelJS.Workbook()  JSZip / pako  await QRCode.toDataURL(text)
+//   const workbook = new ExcelJS.Workbook(); workbook.addWorksheet('Data')
+//   JSZip / pako  await QRCode.toDataURL(text)
 //
 // IMAGE / VIDEO
-//   const img = await Jimp.read(bufOrUrl); img.resize(200, Jimp.AUTO);
+//   const img = await Jimp.read(bufOrUrl); img.resize({ w: 200 });
+//   const out = await img.getBuffer(JimpMime.png);
 //   imageSize(buf)  await exifr.parse(buf)  JPEG / PNG low-level encode/decode
 //   ffmpeg(input).output(out).on('end', ...).run()
-//   Binary paths: ffmpegStatic / ffprobeStatic when present on platform
+//   Bundled path: ffmpegStatic. Install system ffprobe when metadata probing is needed.
 //
 // BLOCKCHAIN / TRADING / YT (heavy — only when needed)
 //   web3  ccxt  coinGecko  solana  bitcoin  ytdl
@@ -205,7 +208,7 @@ export class CodePro implements INodeType {
 		group: ['transform'],
 		version: 1,
 		description:
-			'Run JavaScript with stock Code-compatible modes/helpers and 70+ built-in automation libraries (data, image, video tooling). Build identity: utils.getCodeProVersion()',
+			'Run JavaScript with stock Code-compatible modes/helpers and 74 built-in automation globals (data, image, video tooling). Build identity: utils.getCodeProVersion()',
 		defaults: {
 			name: 'Code Pro',
 		},
@@ -215,7 +218,7 @@ export class CodePro implements INodeType {
 		hints: [
 			{
 				message:
-					'Code Pro executes in the n8n process with full library access. Prefer stock Code on multi-tenant or untrusted instances.',
+					'Code Pro is trusted in-process execution, not a security sandbox. Workflow code can access network, files, subprocesses, environment secrets, and the n8n process. Never run unreviewed or user-supplied code.',
 				type: 'warning',
 				location: 'ndv',
 				whenToDisplay: 'beforeExecution',
@@ -224,7 +227,7 @@ export class CodePro implements INodeType {
 		properties: [
 			{
 				displayName:
-					'<b>Security:</b> Code Pro runs <b>in-process</b> (not the task-runner sandbox) with network-capable libraries (axios, etc.). Use only on <b>trusted self-hosted</b> instances. Heavy libs load when first used.',
+					'<b>Security:</b> Code Pro is <b>trusted in-process execution</b>, not a security sandbox. Scripts and libraries can reach the network, filesystem, subprocesses, environment secrets, and the n8n process. Use only on <b>trusted self-hosted</b> instances and review all code before running it.',
 				name: 'securityNotice',
 				type: 'notice',
 				default: '',
@@ -280,7 +283,7 @@ export class CodePro implements INodeType {
 						// Recommended for multi-site sitemap discovery / large expands.
 						default: 0,
 						description:
-							'Soft timeout in seconds (per invocation — each-item mode gets a full budget per item). 0 = unlimited soft race (wait until the code returns — best for sitemaps / long HTTP). >0 races the script and aborts utils.sitemap HTTP via AbortSignal. Sync infinite loops still hit a ~60s VM guard. Plain axios without signal may linger briefly after a soft timeout. Max 3600.',
+							'Soft timeout in seconds (per invocation — each-item mode gets a full budget per item). 0 = unlimited soft race (wait until the code returns — best for sitemaps / long HTTP). >0 races the script and aborts utils.sitemap HTTP via AbortSignal. Sync loops before the first await hit a ~60s VM guard. CPU loops resumed after await cannot be hard-stopped in-process and can block n8n. Plain axios without signal may linger briefly after a soft timeout. Max 3600.',
 					},
 					{
 						displayName: 'Max Output Items',
@@ -316,7 +319,7 @@ export class CodePro implements INodeType {
 		};
 		// 0 = unlimited soft timeout (default). Shared coerce with runUserCode.
 		const timeout = coerceTimeoutSec(options.timeout);
-		const maxOutputItems = options.maxOutputItems ?? 10_000;
+		const maxOutputItems = coerceMaxOutputItems(options.maxOutputItems);
 
 		if (!code?.trim()) {
 			throw new NodeOperationError(this.getNode(), 'No JavaScript code provided.');
@@ -334,13 +337,7 @@ export class CodePro implements INodeType {
 				for (let i = 0; i < items.length; i++) {
 					try {
 						// Cap before continueOnFail can swallow it
-						if (returnData.length >= maxOutputItems) {
-							enforceMaxOutputItems(
-								[...returnData, { json: {} }],
-								maxOutputItems,
-								this,
-							);
-						}
+						enforceMaxOutputItemCount(returnData.length + 1, maxOutputItems, this);
 
 						const raw = await runUserCode({
 							code,
@@ -353,7 +350,7 @@ export class CodePro implements INodeType {
 						});
 
 						const validated = validateRunCodeEachItem(raw, i, normalize);
-						returnData.push(validated);
+						if (validated !== undefined) returnData.push(validated);
 					} catch (error) {
 						// Never swallow output-cap failures
 						if (isMaxOutputItemsError(error)) {
@@ -386,6 +383,9 @@ export class CodePro implements INodeType {
 				ctx: this,
 			});
 
+			if (Array.isArray(raw)) {
+				enforceMaxOutputItemCount(raw.length, maxOutputItems, this);
+			}
 			const validated = validateRunCodeAllItems(raw, normalize);
 			const capped = enforceMaxOutputItems(validated, maxOutputItems, this);
 			maybeAddPairedItemHint(this, capped, items.length);

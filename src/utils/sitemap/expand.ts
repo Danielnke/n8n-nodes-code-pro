@@ -6,6 +6,7 @@ import { mapPool } from '../mapPool';
 import { detectKind } from './detect';
 import { fetchSitemapXml } from './http';
 import { parseSitemapXml } from './parse';
+import { clampInteger, MAX_REQUEST_CONCURRENCY, MAX_SITEMAP_DEPTH, MAX_SITEMAPS, MAX_SITEMAP_URLS, normalizeTimeoutMs } from './limits';
 import { resolveSitemapSignal } from './signal';
 import type {
 	AttemptReason,
@@ -32,11 +33,11 @@ export async function expandSitemap(
 	input: ExpandInput | string,
 	options: SitemapExpandOptions = {},
 ): Promise<SitemapExpandResult> {
-	const maxDepth = options.maxDepth ?? 3;
-	const maxSitemaps = options.maxSitemaps ?? 50;
-	const maxUrls = options.maxUrls ?? 10_000;
-	const concurrency = options.concurrency ?? 4;
-	const timeoutMs = options.timeoutMs ?? 8000;
+	const maxDepth = clampInteger(options.maxDepth, 3, 0, MAX_SITEMAP_DEPTH);
+	const maxSitemaps = clampInteger(options.maxSitemaps, 50, 1, MAX_SITEMAPS);
+	const maxUrls = clampInteger(options.maxUrls, 10_000, 1, MAX_SITEMAP_URLS);
+	const concurrency = clampInteger(options.concurrency, 4, 1, MAX_REQUEST_CONCURRENCY);
+	const timeoutMs = normalizeTimeoutMs(options.timeoutMs);
 	const includeMetadata = options.includeMetadata === true;
 	const signal = resolveSitemapSignal(options.signal);
 
@@ -45,8 +46,8 @@ export async function expandSitemap(
 
 	const sitemapsVisited: string[] = [];
 	const errors: Array<{ url: string; reason: AttemptReason; message?: string }> = [];
-	const pageLocs: string[] = [];
-	const pageMeta: SitemapUrlEntry[] = [];
+	const pageLocs: string[] | undefined = includeMetadata ? undefined : [];
+	const pageMeta: SitemapUrlEntry[] | undefined = includeMetadata ? [] : undefined;
 	const seenPages = new Set<string>();
 	const seenSitemaps = new Set<string>();
 
@@ -55,18 +56,31 @@ export async function expandSitemap(
 
 	type QueueItem = { url: string; depth: number; xml?: string };
 	const queue: QueueItem[] = [];
+	let queueIndex = 0;
+
+	const canonicalizeSitemapUrl = (candidate: string, parent?: string): string => {
+		try {
+			const base = parent && /^https?:\/\//i.test(parent) ? parent : undefined;
+			const parsed = base ? new URL(candidate, base) : new URL(candidate);
+			if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+			parsed.hash = '';
+			return parsed.href;
+		} catch {
+			return '';
+		}
+	};
 
 	if (normalized.isXml) {
 		const label = normalized.sourceUrl || '(inline-xml)';
 		queue.push({ url: label, depth: 0, xml: normalized.source });
 	} else {
-		const url = String(normalized.source ?? '').trim();
+		const url = canonicalizeSitemapUrl(String(normalized.source ?? '').trim());
 		if (!url) {
 			return {
 				urls: includeMetadata ? [] : [],
 				sitemapsVisited: [],
 				truncated: false,
-				errors: [{ url: '', reason: 'empty', message: 'No sitemap source' }],
+				errors: [{ url: '', reason: 'empty', message: 'No valid HTTP(S) sitemap source' }],
 				kind: null,
 			};
 		}
@@ -81,6 +95,7 @@ export async function expandSitemap(
 		}
 		const r = await fetchSitemapXml(axios, item.url, {
 			timeoutMs,
+			maxContentBytes: options.maxContentBytes,
 			headers: options.headers,
 			signal,
 		});
@@ -95,7 +110,7 @@ export async function expandSitemap(
 		return r.text;
 	}
 
-	while (queue.length > 0) {
+	while (queueIndex < queue.length) {
 		if (truncated) break;
 		if (signal?.aborted) {
 			truncated = true;
@@ -104,13 +119,12 @@ export async function expandSitemap(
 
 		// Take a batch of pending sitemaps at current front depths
 		const batch: QueueItem[] = [];
-		while (queue.length > 0 && batch.length < concurrency) {
-			const next = queue.shift()!;
+		while (queueIndex < queue.length && batch.length < concurrency) {
+			const next = queue[queueIndex++];
 			if (seenSitemaps.has(next.url) && !next.xml) continue;
 			if (sitemapsVisited.length + batch.length >= maxSitemaps) {
 				truncated = true;
-				// put back so we don't lose accounting of remaining work
-				queue.unshift(next);
+				queueIndex--;
 				break;
 			}
 			if (!next.xml) seenSitemaps.add(next.url);
@@ -139,8 +153,9 @@ export async function expandSitemap(
 					continue;
 				}
 				for (const child of parsed.sitemaps) {
-					if (!child || seenSitemaps.has(child)) continue;
-					childUrls.push({ url: child, depth: item.depth + 1 });
+					const childUrl = canonicalizeSitemapUrl(child, item.url);
+					if (!childUrl || seenSitemaps.has(childUrl)) continue;
+					childUrls.push({ url: childUrl, depth: item.depth + 1 });
 				}
 			}
 
@@ -153,13 +168,13 @@ export async function expandSitemap(
 			for (const entry of entries.length ? entries : parsed.urls) {
 				const loc = entry.loc;
 				if (!loc || seenPages.has(loc)) continue;
-				if (pageLocs.length >= maxUrls) {
+				if (seenPages.size >= maxUrls) {
 					truncated = true;
 					break;
 				}
 				seenPages.add(loc);
-				pageLocs.push(loc);
-				pageMeta.push(entry);
+				if (includeMetadata) pageMeta!.push(entry);
+				else pageLocs!.push(loc);
 			}
 
 			// If it looked like an index but also had locs (rare), already handled.
@@ -174,7 +189,7 @@ export async function expandSitemap(
 
 		for (const c of childUrls) {
 			if (seenSitemaps.has(c.url)) continue;
-			if (sitemapsVisited.length + queue.length >= maxSitemaps) {
+			if (sitemapsVisited.length + (queue.length - queueIndex) >= maxSitemaps) {
 				truncated = true;
 				break;
 			}
@@ -183,7 +198,7 @@ export async function expandSitemap(
 	}
 
 	return {
-		urls: includeMetadata ? pageMeta : pageLocs,
+		urls: includeMetadata ? pageMeta! : pageLocs!,
 		sitemapsVisited,
 		truncated,
 		errors,

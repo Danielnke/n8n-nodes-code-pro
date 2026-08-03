@@ -9,7 +9,19 @@ import {
 	safeLoadFfprobePath,
 } from '../libraries';
 
-export function createRestrictedRequire(loadLibraries: boolean): (name: string) => unknown {
+export interface RestrictedRequireOverride {
+	found: boolean;
+	value?: unknown;
+}
+
+export type RestrictedRequireOverrideResolver = (
+	packageName: string,
+) => RestrictedRequireOverride;
+
+export function createRestrictedRequire(
+	loadLibraries: boolean,
+	resolveOverride?: RestrictedRequireOverrideResolver,
+): (name: string) => unknown {
 	const allowedPackages = new Set(loadLibraries ? getAllowedRequirePackages() : []);
 
 	return (name: string): unknown => {
@@ -19,6 +31,9 @@ export function createRestrictedRequire(loadLibraries: boolean): (name: string) 
 				`require('${name}') is not allowed in Code Pro. Use injected globals or a registered package (see README library list).`,
 			);
 		}
+		const override = resolveOverride?.(resolved);
+		if (override?.found) return override.value;
+
 		// NEVER bare-require packages that call process.exit on bad platforms
 		if (resolved === 'ffprobe-static' || name === 'ffprobe-static') {
 			const p = safeLoadFfprobePath();

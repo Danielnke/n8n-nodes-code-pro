@@ -1,303 +1,391 @@
-# n8n-nodes-code-pro
+# Code Pro for n8n
 
-**Code Pro** — self-hosted n8n community node for **JavaScript** with stock Code–compatible modes/helpers and a **large built-in library surface** (no `NODE_FUNCTION_ALLOW_EXTERNAL` / task-runner allowlists).
+Run trusted JavaScript in self-hosted n8n with stock Code-node helpers and 74 ready-to-use globals for data, HTTP, validation, documents, images, media, crypto, and blockchain workflows.
 
-| | |
+[![npm version](https://img.shields.io/npm/v/n8n-nodes-code-pro.svg)](https://www.npmjs.com/package/n8n-nodes-code-pro)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.22.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+> [!WARNING]
+> Code Pro is trusted, in-process execution—not a security sandbox. Scripts can act with the same operating-system, network, file, subprocess, and environment access as your n8n process. Install it only on trusted self-hosted instances and run only code you have reviewed.
+
+## Why use Code Pro?
+
+The stock n8n Code node is ideal for lightweight transforms. Code Pro is for self-hosted workflows that need a broader server-side JavaScript toolbox without configuring external-module allowlists for every script.
+
+| You need | Code Pro provides |
 |---|---|
-| Package | `n8n-nodes-code-pro` |
-| Node | **Code Pro** (`codePro`) |
-| Version | **0.4.0** |
-| Language | JavaScript only |
-| Inject globals | **70+** names (aliases included; see list below) |
-| npm packages | **60+** runtime libraries + first-party `utils` |
+| Familiar n8n authoring | `$input`, `$json`, `$itemIndex`, `items`, `item`, execution modes, item normalization, and item-linking hints |
+| Common automation packages | 74 injected global names backed by 60+ runtime packages |
+| Large or slow jobs | Lazy-loaded heavy libraries, bounded concurrency helpers, output caps, and configurable timeouts |
+| Sitemap processing | Discovery through `robots.txt`, XML parsing, gzip support, nested-index expansion, diagnostics, and safety limits |
+| Portable examples | Importable n8n workflows for basic transforms, Zod validation, and sitemap discovery |
+| Operational visibility | Runtime version and library availability helpers |
 
-Globals are available **by name in your script** (e.g. `_.map(...)`, `dayjs()`, `z.object(...)`).  
-Runtime inventory:
+## Requirements and compatibility
 
-| Helper | Meaning |
-|---|---|
-| `utils.getRegisteredLibraries()` | Every inject name declared in the package |
-| `utils.getAvailableLibraries()` | Registered libs minus known load failures (lazy libs count until they fail) |
-| `utils.getFailedLibraries()` | Injects that failed to load (package/binary/platform) |
-| `utils.isLibraryAvailable('Jimp')` | Boolean check for one name |
-| `utils.sitemap.*` | Discover / parse / expand website sitemaps (see below) |
-| `utils.mapPool(items, n, fn)` | Bounded-concurrency async map (order-preserving) |
+- Self-hosted n8n. n8n Cloud does not install arbitrary community packages.
+- Node.js 22.22.0 or newer.
+- Enough disk and memory for the features you use. The package includes an FFmpeg binary and several intentionally large, lazily loaded libraries.
+- In n8n queue mode, install the package on every worker that may execute the node.
+- JavaScript only; Python is not supported.
 
-Heavy libraries (image, video, blockchain, spreadsheets, …) **load on first use**.
+Code Pro declares the n8n community-node API v1 and strict package validation. Keep n8n and Code Pro updated together, and test upgrades on a non-production instance first.
 
----
+## Install
 
-## Supported libraries
+### From the n8n interface
 
-Inject name = global in the Code Pro sandbox. Aliases share the same package.
+1. Open **Settings → Community Nodes**.
+2. Select **Install a community node**.
+3. Enter `n8n-nodes-code-pro`.
+4. Confirm that you understand the risks of community code.
+5. Restart n8n if the **Code Pro** node does not appear immediately.
 
-### Data manipulation & IDs
+### From npm
 
-| Global(s) | npm package | What it’s for |
-|---|---|---|
-| `_`, `lodash` | `lodash` | Arrays/objects, grouping, deep get/set, chaining |
-| `bytes` | `bytes` | Human-readable byte sizes ↔ numbers |
-| `ms` | `ms` | Duration strings (`"5m"`) ↔ milliseconds |
-| `qs` | `qs` | Query-string parse/stringify |
-| `uuid` | `uuid` | UUID v1/v4/v5 (e.g. `uuid.v4()`) |
-| `nanoid` | `nanoid` | Compact unique IDs (`nanoid()` / `nanoid.nanoid()`) |
-| `utils` | *(built-in)* | `sleep`, `retry`, `mapPool`, `sitemap`, `flatten`, `getAvailableLibraries`, … |
-
-### Dates & time
-
-| Global(s) | npm package | What it’s for |
-|---|---|---|
-| `dayjs` | `dayjs` | Lightweight date parse/format/math |
-| `moment` | `moment-timezone` | Dates with timezone support |
-| `dateFns` | `date-fns` | Functional date helpers |
-| `dateFnsTz` | `date-fns-tz` | Timezone-aware date-fns |
-| `luxon`, `DateTime` | `luxon` | n8n-aligned DateTime API |
-| `cronParser` | `cron-parser` | Cron expression next/prev runs |
-
-### Validation & schemas
-
-| Global(s) | npm package | What it’s for |
-|---|---|---|
-| `joi`, `Joi` | `joi` | Schema validation (object/string/number rules) |
-| `yup` | `yup` | Schema validation (chainable) |
-| `z`, `zod` | `zod` | TypeScript-first schema validation |
-| `Ajv` | `ajv` | JSON Schema validation |
-| `validator` | `validator` | String checks (email, URL, etc.) |
-| `phoneNumber` | `libphonenumber-js` | Parse/validate/format phone numbers |
-| `iban` | `iban` | IBAN validation |
-
-### Parse / serialize (CSV, XML, YAML, config)
-
-| Global(s) | npm package | What it’s for |
-|---|---|---|
-| `papaparse`, `Papa` | `papaparse` | CSV parse/unparse |
-| `xml2js` | `xml2js` | XML ↔ JS objects |
-| `XMLParser`, `XMLBuilder` | `fast-xml-parser` | Fast XML parse/build |
-| `YAML` | `yaml` | YAML parse/stringify |
-| `ini` | `ini` | INI config files |
-| `toml` | `toml` | TOML config files |
-| `jmespath` | `jmespath` | Query nested JSON (`a.b[0].c`) |
-| `jsonDiff` | `json-diff-ts` | Structural JSON diffs |
-
-### HTML, text, templates, fuzzy match
-
-| Global(s) | npm package | What it’s for |
-|---|---|---|
-| `cheerio` | `cheerio` | jQuery-like HTML parsing/scraping |
-| `htmlToText` | `html-to-text` | HTML → plain text |
-| `marked` | `marked` | Markdown → HTML |
-| `Handlebars` | `handlebars` | HTML/string templating |
-| `slug` | `slug` | URL-safe slugs |
-| `pluralize` | `pluralize` | English plural/singular |
-| `fuzzy` | `fuse.js` | Fuzzy search over lists |
-| `stringSimilarity` | `string-similarity` | Compare string similarity |
-| `franc` | `franc-min` | Language detection |
-| `compromise` | `compromise` | Lightweight NLP on text |
-
-### Crypto, JWT, passwords
-
-| Global(s) | npm package | What it’s for |
-|---|---|---|
-| `CryptoJS` | `crypto-js` | Hashing/encryption (MD5, AES, …) |
-| `nodeCrypto` | `crypto` (Node) | Native Node crypto |
-| `forge` | `node-forge` | TLS/PKI-oriented crypto primitives |
-| `jwt` | `jsonwebtoken` | Sign/verify JWTs |
-| `bcrypt`, `bcryptjs` | `bcryptjs` | Password hashing |
-| `secp256k1` | `@noble/secp256k1` | secp256k1 keys/signatures |
-| `bip39` | `@scure/bip39` | BIP-39 mnemonics |
-
-### HTTP & networking
-
-| Global(s) | npm package | What it’s for |
-|---|---|---|
-| `axios` | `axios` | HTTP client (GET/POST, JSON, …) |
-| `FormData` | `form-data` | Multipart form bodies |
-| `pRetry` | `p-retry` | Retry async operations |
-| `utils.sitemap` | *(built-in)* | Sitemap find / parse / expand (uses axios) |
-
-### Spreadsheets, archives, QR
-
-| Global(s) | npm package | What it’s for |
-|---|---|---|
-| `XLSX`, `xlsx` | `xlsx` | Read/write Excel workbooks (SheetJS community) |
-| `ExcelJS` | `exceljs` | Richer Excel read/write |
-| `JSZip` | `jszip` | Create/read ZIP archives |
-| `pako` | `pako` | Deflate/inflate compression |
-| `QRCode` | `qrcode` | Generate QR codes |
-
-### Image manipulation & metadata
-
-| Global(s) | npm package | What it’s for |
-|---|---|---|
-| `Jimp`, `jimp` | `jimp` | Resize, crop, rotate, composite, encode/decode images (pure JS) |
-| `imageSize` | `image-size` | Fast width/height/type from buffer or file path |
-| `exifr` | `exifr` | EXIF / image metadata parse |
-| `JPEG` | `jpeg-js` | Low-level JPEG encode/decode |
-| `PNG` | `pngjs` | Low-level PNG encode/decode/sync API |
-
-### Video / media processing
-
-| Global(s) | npm package | What it’s for |
-|---|---|---|
-| `ffmpeg` | `fluent-ffmpeg` | Programmatic FFmpeg pipelines (transcode, screenshots, filters). Auto-wires `ffmpeg-static` / `ffprobe-static` paths when present. |
-| `ffmpegStatic` | `ffmpeg-static` | Path to bundled `ffmpeg` binary |
-| `ffprobeStatic` | `ffprobe-static` | Path to bundled `ffprobe` binary (metadata / duration) |
-
-### Blockchain / trading (heavy; load when used)
-
-| Global(s) | npm package | What it’s for |
-|---|---|---|
-| `web3` | `web3` | Ethereum / EVM interactions |
-| `ccxt` | `ccxt` | Crypto exchange APIs |
-| `coinGecko` | `coingecko-api-v3` | CoinGecko market data client |
-| `solana` | `@solana/web3.js` | Solana web3 |
-| `bitcoin` | `bitcoinjs-lib` | Bitcoin transactions/scripts |
-| `ytdl` | `@distube/ytdl-core` | YouTube stream/info helpers |
-
-### Full inject name list
-
-`_`, `lodash`, `bytes`, `ms`, `qs`, `uuid`, `nanoid`, `utils`, `dayjs`, `moment`, `dateFns`, `dateFnsTz`, `luxon`, `DateTime`, `cronParser`, `joi`, `Joi`, `yup`, `z`, `zod`, `Ajv`, `validator`, `phoneNumber`, `iban`, `papaparse`, `Papa`, `xml2js`, `XMLParser`, `XMLBuilder`, `YAML`, `ini`, `toml`, `jmespath`, `jsonDiff`, `cheerio`, `htmlToText`, `marked`, `Handlebars`, `slug`, `pluralize`, `fuzzy`, `stringSimilarity`, `franc`, `compromise`, `CryptoJS`, `nodeCrypto`, `forge`, `jwt`, `bcrypt`, `bcryptjs`, `secp256k1`, `bip39`, `axios`, `FormData`, `pRetry`, `XLSX`, `xlsx`, `ExcelJS`, `JSZip`, `pako`, `QRCode`, `Jimp`, `jimp`, `imageSize`, `exifr`, `JPEG`, `PNG`, `ffmpeg`, `ffmpegStatic`, `ffprobeStatic`, `web3`, `ccxt`, `coinGecko`, `solana`, `bitcoin`, `ytdl`
-
----
-
-## Install (self-hosted)
-
-This package is large (many automation libraries + optional ffmpeg binaries). Prefer a machine with enough disk/RAM. Persist `~/.n8n` (Docker: `/home/node/.n8n`). In **queue mode**, install on every worker.
-
-Video tools use `ffmpeg-static` / `ffprobe-static` when the binary exists for your OS/arch; otherwise install system `ffmpeg` and set paths in code via `ffmpeg.setFfmpegPath(...)`.
-
-### Community Nodes UI (after publish)
-
-1. Settings → Community Nodes → Install  
-2. Package: `n8n-nodes-code-pro`  
-3. Restart n8n if needed  
-
-### Local / custom extensions
+Install the package in the same community-node directory and runtime used by n8n, then restart every n8n process:
 
 ```bash
-cd n8n-nodes-code-pro
-npm install
+npm install n8n-nodes-code-pro
+```
+
+For source development, build this repository and point `N8N_CUSTOM_EXTENSIONS` at its absolute path:
+
+```bash
+npm ci
 npm run build
 ```
 
-```bash
-# Windows PowerShell example
-$env:N8N_CUSTOM_EXTENSIONS = "C:\path\to\n8n-nodes-code-pro"
+```powershell
+$env:N8N_CUSTOM_EXTENSIONS = "C:\absolute\path\to\n8n-nodes-code-pro"
+n8n start
 ```
 
-Restart n8n. Palette: **Code Pro**.
+## Quick start
 
----
-
-## Usage (parameters)
-
-| Parameter | Description |
-|---|---|
-| **Mode** | Run Once for All Items / Run Once for Each Item |
-| **JavaScript** | Your script (`jsCode`); libraries are globals |
-| **Options → Timeout** | Soft timeout seconds. **0 = unlimited** (default; wait until code returns). `>0` races the script and aborts `utils.sitemap` HTTP via AbortSignal |
-| **Options → Max Output Items** | Fail if more items returned (default 10 000); not bypassed by continueOnFail |
-
-**Return shape:** all-items → `[{ json: { ... } }, ...]`; each-item → single `{ json: { ... } }`. Prefer `pairedItem` when counts differ.
-
----
-
-## Sitemap workflows (`utils.sitemap`)
-
-First-party helpers for **sitemap-heavy** jobs: discover XML via `robots.txt` + common paths, parse urlsets/indexes, optionally expand nested indexes to page URLs. Uses the same **axios** inject (browser-like headers, gzip `.xml.gz`, parallel probes, attempt diagnostics).
-
-| Method | What it does |
-|---|---|
-| `utils.sitemap.find(website, opts?)` | Discover + fetch primary sitemap XML |
-| `utils.sitemap.parse(rawXml)` | Parse urlset / sitemapindex (no network) |
-| `utils.sitemap.expand(urlOrXml, opts?)` | Walk indexes → page URLs (caps: `maxDepth`, `maxSitemaps`, `maxUrls`) |
-| `utils.sitemap.fromWebsite(website, opts?)` | find + optional `expand: true` |
-| `utils.sitemap.fromWebsites(list, opts?)` | Batch sites (`websiteConcurrency`) |
-
-**Defaults that matter:** expand is **opt-in** (`expand: true`). Expanded `urls` are **strings** unless `includeMetadata: true`. `rawXml` is dropped when expanding (set `includeRawXml: true` to keep it). Caps default to `maxDepth: 3`, `maxSitemaps: 50`, `maxUrls: 10000`.
-
-### A) One item per site (discover + fetch raw XML)
+Add **Code Pro**, keep **Run Once for All Items**, and replace the editor contents with:
 
 ```js
-// Mode: Run Once for All Items
-// Options → Timeout: 0 (unlimited, default) for multi-site batches that may take minutes
-// Returns website, sourceUrl, rawXml, found — ready for a downstream parse/rank node
-const sites = $input.all().map((i) => i.json.website || i.json.Website);
-const results = await utils.sitemap.fromWebsites(sites, {
-  expand: false,           // discovery only — keep rawXml
-  includeRawXml: true,
-  websiteConcurrency: 3,
-  concurrency: 4,
-  timeoutMs: 8000, // per-request HTTP only (not the whole node)
-});
-return results.map((r, index) => ({
+const rows = $input.all().map((input) => input.json);
+
+return rows.map((row, index) => ({
   json: {
-    website: r.website,
-    found: r.found,
-    sourceUrl: r.sourceUrl,
-    rawXml: r.rawXml, // full sitemap body (can be large)
-    kind: r.kind,
-    robotsSitemaps: r.robotsSitemaps,
-    // attempts[] explains found:false (not_xml, http_error, timeout, network, …)
-    attempts: r.found ? undefined : r.attempts,
+    ...row,
+    id: uuid.v4(),
+    processedAt: dayjs().toISOString(),
   },
   pairedItem: { item: index },
 }));
 ```
 
-### B) One item per page URL (expand, cap-aware)
+Libraries are injected as globals, so use `uuid`, `dayjs`, `_`, `axios`, or `z` directly. A restricted `require()` is available for registered packages, but the injected globals are the simplest and most portable interface.
+
+## Execution model
+
+| Setting | Contract |
+|---|---|
+| **Run Once for All Items** | Runs once. Return an array of n8n items. Best for batching, fan-out, joins, and sitemap work. |
+| **Run Once for Each Item** | Runs once per input. Return one item, a one-element array, `null`, `undefined`, or an empty array. Empty results skip that input. |
+| **Timeout** | `0` disables the async soft timeout. A positive value races asynchronous work and aborts sitemap HTTP requests that honor the execution signal. |
+| **Max Output Items** | Defaults to 10,000 and is fail-closed. Invalid values fall back to the default; the maximum configurable cap is 1,000,000. |
+
+Synchronous evaluation always has a 60-second VM guard when Timeout is `0`. A positive Timeout also becomes the synchronous VM budget. Asynchronous CPU loops resumed after an `await` cannot be forcibly stopped inside the n8n process; avoid CPU-bound or untrusted code.
+
+Use `pairedItem` whenever output counts or ordering differ from the input so downstream expressions preserve item lineage.
+
+## Everyday recipes
+
+### Validate input with Zod
 
 ```js
-const website = $json.website || $json.Website;
-const r = await utils.sitemap.fromWebsite(website, {
-  expand: true,
-  maxUrls: 5000,
-  maxDepth: 3,
-  concurrency: 4,
+const schema = z.object({
+  email: z.string().email(),
+  active: z.boolean().default(true),
 });
-if (!r.found) {
-  return [{ json: { website, found: false, attempts: r.attempts } }];
-}
-// Watch Options → Max Output Items when fan-out is large
-return r.urls.map((loc) => ({
-  json: { loc, website, sourceUrl: r.sourceUrl, truncated: r.truncated },
+
+return $input.all().map((input, index) => ({
+  json: schema.parse(input.json),
+  pairedItem: { item: index },
 }));
 ```
 
-**Tips**
+### Make bounded HTTP requests
 
-- Prefer **All Items** for multi-site batches.
-- **Timeout 0 (default)** waits until the script returns — use this for slow sites / large expands. Set a positive Timeout only if you want a hard soft-cap; sitemap HTTP then cancels via AbortSignal.
-- `timeoutMs` on `utils.sitemap.*` is **per HTTP request**, not the whole node run.
-- Large expands can hit **Max Output Items** — lower `maxUrls` or batch.
-- Example workflow: `examples/code-pro-sitemap.json`
-- Offline tests: `npm run test:sitemap`
-- Design notes (repo, not on npm): `docs/SITEMAP.md`
+```js
+const urls = $input.all().map((input) => String(input.json.url));
 
-Optional workflow imports: `examples/code-pro-basic.json`, `examples/code-pro-validate-zod.json`.
+const results = await utils.mapPool(urls, 4, async (url) => {
+  try {
+    const response = await axios.get(url, {
+      timeout: 10_000,
+      responseType: "text",
+    });
+    return { url, ok: true, status: response.status };
+  } catch (error) {
+    return { url, ok: false, error: error.message };
+  }
+});
 
----
-
-## Security
-
-Code Pro runs **in the n8n process** (not the stock Code task-runner sandbox), with network-capable libraries available. Treat it as a **trusted power-user** node on **self-hosted** instances only.
-
----
-
-## Develop
-
-```bash
-npm install
-npm run build
-npm run lint
-npm run smoke:libs
-npm run test:libs
-npm run test:golden
-npm run dev
+return results.map((json, index) => ({
+  json,
+  pairedItem: { item: index },
+}));
 ```
 
-Live n8n acceptance (required before claiming the node works in production): see `scripts/live-n8n-checklist.md`. Use `utils.getCodeProVersion()` inside the node to confirm the loaded build.
+### Parse CSV
 
-## License
+```js
+const parsed = Papa.parse(String($json.csv), {
+  header: true,
+  skipEmptyLines: true,
+});
 
-MIT
+return parsed.data.map((json) => ({ json }));
+```
+
+### Create an Excel workbook
+
+```js
+const workbook = new ExcelJS.Workbook();
+const sheet = workbook.addWorksheet("Data");
+sheet.columns = [
+  { header: "Name", key: "name" },
+  { header: "Email", key: "email" },
+];
+sheet.addRows($input.all().map((input) => input.json));
+
+const buffer = await workbook.xlsx.writeBuffer();
+return [{ json: { bytes: buffer.byteLength } }];
+```
+
+### Resize an image with Jimp
+
+```js
+const image = await Jimp.read(imageBuffer);
+image.resize({ w: 320 });
+const resized = await image.getBuffer(JimpMime.png);
+```
+
+Code Pro also keeps common Jimp 0.x calls such as `resize(width, height)` and `getBufferAsync()` working while using Jimp 1.x.
+
+## Included libraries
+
+Heavy packages are loaded on first use. Aliases in the same row refer to the same package.
+
+| Area | Globals |
+|---|---|
+| Data and IDs | `_`, `lodash`, `bytes`, `ms`, `qs`, `uuid`, `nanoid`, `utils` |
+| Dates and schedules | `dayjs`, `moment`, `dateFns`, `dateFnsTz`, `luxon`, `DateTime`, `cronParser` |
+| Validation | `joi`, `Joi`, `yup`, `z`, `zod`, `Ajv`, `validator`, `phoneNumber`, `iban` |
+| CSV, XML, and config | `Papa`, `papaparse`, `xml2js`, `XMLParser`, `XMLBuilder`, `YAML`, `ini`, `toml`, `jmespath`, `jsonDiff` |
+| HTML and text | `cheerio`, `htmlToText`, `marked`, `Handlebars`, `slug`, `pluralize`, `fuzzy`, `stringSimilarity`, `franc`, `compromise` |
+| Crypto and authentication | `CryptoJS`, `nodeCrypto`, `forge`, `jwt`, `bcrypt`, `bcryptjs`, `secp256k1`, `bip39` |
+| HTTP | `axios`, `FormData`, `pRetry` |
+| Documents and archives | `ExcelJS`, `JSZip`, `pako`, `QRCode` |
+| Images | `Jimp`, `jimp`, `JimpMime`, `imageSize`, `exifr`, `JPEG`, `PNG` |
+| Video and media | `ffmpeg`, `ffmpegStatic`, `ytdl` |
+| Blockchain and trading | `web3`, `ccxt`, `coinGecko`, `solana`, `bitcoin` |
+
+Full injected-name inventory:
+
+```text
+utils, _, lodash, bytes, ms, qs, uuid, nanoid, dayjs, moment, dateFns,
+dateFnsTz, luxon, DateTime, cronParser, joi, Joi, validator, Ajv, yup, z,
+zod, phoneNumber, iban, xml2js, XMLParser, XMLBuilder, YAML, papaparse,
+Papa, ini, toml, jmespath, jsonDiff, cheerio, Handlebars, htmlToText,
+marked, slug, pluralize, fuzzy, stringSimilarity, franc, compromise,
+CryptoJS, forge, jwt, bcrypt, bcryptjs, nodeCrypto, secp256k1, bip39,
+axios, FormData, pRetry, ExcelJS, JSZip, pako, QRCode, Jimp, jimp,
+JimpMime, imageSize, exifr, JPEG, PNG, web3, ccxt, coinGecko, solana,
+bitcoin, ytdl, ffmpeg, ffmpegStatic
+```
+
+Inspect the running installation instead of relying on a static list:
+
+```js
+return [{
+  json: {
+    version: utils.getCodeProVersion(),
+    registered: utils.getRegisteredLibraries(),
+    available: utils.getAvailableLibraries(),
+    failed: utils.getFailedLibraries(),
+  },
+}];
+```
+
+`getAvailableLibraries()` is optimistic for lazy libraries until they are first loaded. Use `utils.isLibraryAvailable("Jimp")` after loading a feature when availability matters.
+
+## Sitemap toolkit
+
+`utils.sitemap` handles the repetitive and failure-prone parts of sitemap workflows.
+
+| Method | Purpose |
+|---|---|
+| `find(website, options?)` | Check `robots.txt` and common paths, fetch the first valid sitemap, and return diagnostics |
+| `parse(xml)` | Parse a sitemap `urlset` or `sitemapindex` without a network request |
+| `expand(urlOrXml, options?)` | Walk nested sitemap indexes and return page URLs |
+| `fromWebsite(website, options?)` | Discover one site and optionally expand it |
+| `fromWebsites(websites, options?)` | Process several sites with bounded website concurrency |
+
+### Discover several sites
+
+```js
+const websites = $input.all().map(
+  (input) => input.json.website || input.json.Website,
+);
+
+const results = await utils.sitemap.fromWebsites(websites, {
+  expand: false,
+  includeRawXml: true,
+  websiteConcurrency: 3,
+  concurrency: 4,
+  timeoutMs: 8_000,
+});
+
+return results.map((json, index) => ({
+  json,
+  pairedItem: { item: index },
+}));
+```
+
+### Expand to one item per page URL
+
+```js
+const result = await utils.sitemap.fromWebsite($json.website, {
+  expand: true,
+  maxDepth: 3,
+  maxSitemaps: 50,
+  maxUrls: 5_000,
+});
+
+if (!result.found) {
+  return [{ json: {
+    website: $json.website,
+    found: false,
+    attempts: result.attempts,
+  } }];
+}
+
+return result.urls.map((loc) => ({
+  json: {
+    loc,
+    sourceUrl: result.sourceUrl,
+    truncated: result.truncated,
+  },
+}));
+```
+
+Expansion is opt-in. URL results are strings unless `includeMetadata: true`. Raw XML is omitted during expansion unless `includeRawXml: true`.
+
+Safety limits include:
+
+- 20 MiB default per sitemap response, configurable with `maxContentBytes` up to the 50 MiB sitemap-protocol ceiling.
+- 1 MiB maximum `robots.txt` response.
+- Bounded request concurrency (maximum 16) and website concurrency (maximum 8).
+- Maximums of 500 sitemaps, depth 10, and 1,000,000 URLs.
+- Candidate and robots-declaration caps, gzip decompression limits, URL canonicalization, and generic-XML rejection.
+- Diagnostic attempt reasons including `not_xml`, `too_large`, `http_error`, `timeout`, and `network`.
+
+`timeoutMs` is per HTTP request; the node’s **Timeout** applies to the whole invocation.
+
+## Built-in `utils`
+
+Frequently useful helpers include:
+
+- `utils.mapPool(items, concurrency, fn)` — order-preserving bounded async mapping.
+- `utils.retry(fn, options)` — retry with bounded attempts and tracked delays.
+- `utils.sleep(ms)` — a delay cleaned up when the invocation ends.
+- `utils.flatten(value)` — flatten nested objects.
+- `utils.isEmail(value)` and `utils.isUrl(value)` — lightweight checks.
+- `utils.sanitizeInput(value)` — basic string cleanup only. It is not HTML/XSS sanitization or SQL escaping.
+- `utils.memoryUsage()` — a snapshot of Node.js process memory.
+- Library inventory and Code Pro version helpers shown above.
+
+Invocation-created timers are tracked and cleared on completion to avoid leaking background intervals into later executions.
+
+## Security and operations
+
+Code Pro uses Node's `vm` module for execution context ergonomics. Node explicitly does not treat `vm` as a security mechanism, and neither does Code Pro.
+
+- Never run code supplied by webhook callers, form users, tenants, or an AI agent without human review.
+- Assume scripts can read environment secrets, access mounted files, make network requests, launch subprocesses, and affect the n8n process.
+- Apply least-privilege container users, read-only mounts where practical, network egress controls, and narrowly scoped credentials at the n8n deployment level.
+- Keep the node unavailable to untrusted workflow editors.
+- Prefer isolated worker/container boundaries for risky or resource-intensive jobs.
+- Avoid unbounded `Promise.all`, large in-memory buffers, and returning raw sitemap XML unless a downstream node needs it.
+- Review community-node updates before deploying them.
+
+The bundled `fluent-ffmpeg` package is deprecated upstream. It remains for compatibility; for new high-assurance media workflows, consider calling a maintained FFmpeg wrapper or an isolated media service. `ffmpegStatic` supplies the bundled FFmpeg path. Install a system `ffprobe` and configure `ffmpeg.setFfprobePath(...)` if probing is required.
+
+## Importable examples
+
+The npm package includes:
+
+- `examples/code-pro-basic.json` — enrich and preserve item linking.
+- `examples/code-pro-validate-zod.json` — validate data with Zod.
+- `examples/code-pro-sitemap.json` — discover and inspect sitemaps.
+
+Import a file through **Workflows → Import from File**, inspect its code, then replace the sample input with your own data.
+
+## Upgrading to 0.5
+
+Version 0.5 raises the runtime requirement to Node.js 22.22.0 and removes two problematic globals:
+
+- `XLSX` / `xlsx`: removed because the npm `xlsx` release line has unresolved security advisories. Use `ExcelJS`.
+- `ffprobeStatic`: removed to reduce the installed footprint. Install system `ffprobe` when needed.
+
+Jimp is upgraded to 1.x with compatibility adapters for common 0.x methods. Test image and media workflows before production rollout.
+
+Upgrade with:
+
+```bash
+npm install n8n-nodes-code-pro@latest
+```
+
+Restart every n8n main and worker process, then confirm the loaded version with `utils.getCodeProVersion()`.
+
+## Troubleshooting
+
+**Code Pro does not appear**
+
+- Confirm the package is installed in the n8n instance's community-node directory.
+- Restart all n8n processes.
+- In queue mode, verify every worker has the same package version.
+- Check startup logs for community-node validation or dependency errors.
+
+**A library says it is unavailable**
+
+Run the inventory snippet above and inspect `utils.getFailedLibraries()`. Lazy libraries are tested only when first accessed. Check the host architecture, binary availability, and install logs.
+
+**A workflow times out**
+
+`Timeout` is per Code Pro invocation. Raise it or use `0` for intentionally long async work, and set explicit timeouts on network requests. A timeout is cooperative for async/native work, not a process-level kill switch.
+
+**Output exceeds Max Output Items**
+
+Reduce fan-out, lower sitemap `maxUrls`, or batch the work. Raise the cap only after checking worker memory.
+
+**FFmpeg or ffprobe fails**
+
+Verify `ffmpegStatic`, or install system binaries and set paths with `ffmpeg.setFfmpegPath(...)` and `ffmpeg.setFfprobePath(...)`.
+
+For reproducible bug reports, include the n8n version, Node.js version, Code Pro version, deployment mode, platform/architecture, a minimal workflow, and relevant logs with secrets removed.
+
+## Development
+
+```bash
+npm ci
+npm run verify
+npm pack --dry-run
+```
+
+`npm run verify` performs TypeScript checks, a clean build, execution-contract tests, sitemap tests, an n8n execution simulation, library loading smoke tests, and functional library checks.
+
+See `scripts/live-n8n-checklist.md` for the manual n8n acceptance checklist.
+
+## Support and license
+
+Report defects and request features through [GitHub Issues](https://github.com/Danielnke/n8n-nodes-code-pro/issues).
+
+Code Pro is released under the [MIT License](LICENSE).

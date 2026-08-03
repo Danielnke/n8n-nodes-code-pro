@@ -7,6 +7,7 @@ import { detectKind } from './detect';
 import { fetchSitemapXml, fetchText } from './http';
 import { normalizeBase, resolveSitemapUrl } from './normalize';
 import { DEFAULT_SITEMAP_PATHS } from './paths';
+import { clampInteger, MAX_DISCOVERY_CANDIDATES, MAX_REQUEST_CONCURRENCY, MAX_ROBOTS_SITEMAPS, normalizeTimeoutMs } from './limits';
 import { parseRobotsSitemaps } from './robots';
 import { resolveSitemapSignal } from './signal';
 import type {
@@ -22,8 +23,8 @@ async function tryCandidates(
 	options: SitemapFindOptions,
 	attempts: SitemapAttempt[],
 ): Promise<{ sourceUrl: string; rawXml: string } | null> {
-	const concurrency = options.concurrency ?? 4;
-	const timeoutMs = options.timeoutMs ?? 8000;
+	const concurrency = clampInteger(options.concurrency, 4, 1, MAX_REQUEST_CONCURRENCY);
+	const timeoutMs = normalizeTimeoutMs(options.timeoutMs);
 	const signal = resolveSitemapSignal(options.signal);
 
 	// Parallel probes but stop early once we have a winner (best-effort).
@@ -49,6 +50,7 @@ async function tryCandidates(
 			}
 			const r = await fetchSitemapXml(axios, url, {
 				timeoutMs,
+				maxContentBytes: options.maxContentBytes,
 				headers: options.headers,
 				signal,
 			});
@@ -109,7 +111,8 @@ export async function findSitemap(
 	const signal = resolveSitemapSignal(options.signal);
 	const robotsUrl = `${base}/robots.txt`;
 	const robotsRes = await fetchText(axios, robotsUrl, {
-		timeoutMs: options.timeoutMs ?? 8000,
+		timeoutMs: normalizeTimeoutMs(options.timeoutMs),
+		maxContentBytes: options.maxContentBytes,
 		headers: options.headers,
 		signal,
 	});
@@ -126,7 +129,7 @@ export async function findSitemap(
 	});
 
 	if (robotsRes.ok && robotsRes.text) {
-		for (const s of parseRobotsSitemaps(robotsRes.text)) {
+		for (const s of parseRobotsSitemaps(robotsRes.text).slice(0, MAX_ROBOTS_SITEMAPS)) {
 			const absolute = resolveSitemapUrl(base, s);
 			if (absolute && !robotsSitemaps.includes(absolute)) {
 				robotsSitemaps.push(absolute);
@@ -135,16 +138,26 @@ export async function findSitemap(
 	}
 
 	// 2) Candidate list: robots first, then paths
+	const extraPaths = (options.paths ?? []).slice(0, MAX_DISCOVERY_CANDIDATES);
 	const pathList = options.replacePaths
-		? options.paths ?? []
-		: [...DEFAULT_SITEMAP_PATHS, ...(options.paths ?? [])];
+		? extraPaths
+		: [...DEFAULT_SITEMAP_PATHS, ...extraPaths];
 
 	const seen = new Set<string>();
 	const candidates: string[] = [];
 	const push = (u: string) => {
-		if (!u || seen.has(u)) return;
-		seen.add(u);
-		candidates.push(u);
+		if (!u || candidates.length >= MAX_DISCOVERY_CANDIDATES) return;
+		try {
+			const parsed = new URL(u);
+			if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
+			parsed.hash = '';
+			const canonical = parsed.href;
+			if (seen.has(canonical)) return;
+			seen.add(canonical);
+			candidates.push(canonical);
+		} catch {
+			return;
+		}
 	};
 	for (const s of robotsSitemaps) push(s);
 	for (const p of pathList) {

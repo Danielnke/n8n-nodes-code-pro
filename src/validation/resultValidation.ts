@@ -108,9 +108,9 @@ export function validateRunCodeEachItem(
 	executionResult: unknown,
 	itemIndex: number,
 	normalize: NormalizeItemsFn = normalizeItems,
-): INodeExecutionData {
+): INodeExecutionData | undefined {
 	if (executionResult === null || executionResult === undefined) {
-		return { json: {}, pairedItem: { item: itemIndex } };
+		return undefined;
 	}
 
 	if (typeof executionResult !== 'object') {
@@ -125,12 +125,12 @@ export function validateRunCodeEachItem(
 	// Stock Code rejects any array; we accept a single-element array and unwrap it.
 	if (Array.isArray(executionResult)) {
 		if (executionResult.length === 0) {
-			return { json: {}, pairedItem: { item: itemIndex } };
+			return undefined;
 		}
 		if (executionResult.length === 1) {
 			executionResult = executionResult[0];
 			if (executionResult === null || executionResult === undefined) {
-				return { json: {}, pairedItem: { item: itemIndex } };
+				return undefined;
 			}
 			if (typeof executionResult !== 'object' || Array.isArray(executionResult)) {
 				throw new CodeProValidationError(
