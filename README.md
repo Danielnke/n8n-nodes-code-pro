@@ -1,22 +1,25 @@
 # Code Pro for n8n
 
-Run trusted JavaScript in self-hosted n8n with stock Code-node helpers and 74 ready-to-use globals for data, HTTP, validation, documents, images, media, crypto, and blockchain workflows.
+Run trusted JavaScript or native Python in self-hosted n8n. JavaScript keeps Code Pro's stock Code-node helpers and 74 ready-to-use globals; Python 3.11+ adds a focused standard-library runner with matching n8n item semantics.
 
 [![npm version](https://img.shields.io/npm/v/n8n-nodes-code-pro.svg)](https://www.npmjs.com/package/n8n-nodes-code-pro)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.22.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > [!WARNING]
-> Code Pro is trusted, in-process execution—not a security sandbox. Scripts can act with the same operating-system, network, file, subprocess, and environment access as your n8n process. Install it only on trusted self-hosted instances and run only code you have reviewed.
+> Code Pro executes trusted code, not a security sandbox. JavaScript runs in n8n and Python runs in a native child process; both can act with the n8n user's filesystem, network, subprocess, environment, credential, and workflow-data access. Python deliberately inherits the complete n8n environment. Install it only on trusted self-hosted instances and run only code you have reviewed.
+
+> **Python security model:** Python is a native subprocess, not an in-process VM and not a sandbox. It inherits the complete n8n environment by design. This does not prevent reviewed code from reading or exfiltrating secrets; keep untrusted code in a separately isolated, least-privilege worker or container.
 
 ## Why use Code Pro?
 
-The stock n8n Code node is ideal for lightweight transforms. Code Pro is for self-hosted workflows that need a broader server-side JavaScript toolbox without configuring external-module allowlists for every script.
+The stock n8n Code node is ideal for lightweight transforms. Code Pro is for self-hosted workflows that need either its broader server-side JavaScript toolbox or a small, operationally bounded native-Python path with the same n8n item behavior.
 
 | You need | Code Pro provides |
 |---|---|
-| Familiar n8n authoring | `$input`, `$json`, `$itemIndex`, `items`, `item`, execution modes, item normalization, and item-linking hints |
-| Common automation packages | 74 injected global names backed by 60+ runtime packages |
+| Familiar n8n authoring | JavaScript `$input`, `$json`, `$itemIndex`, `items`, `item`; Python `_input`, `_json`, `_item_index`, `items`, `item`; shared modes, normalization, and linking hints |
+| JavaScript automation packages | 74 injected global names backed by 60+ runtime packages |
+| Native Python standard library | Python 3.11+ imports plus bounded HTTP, retry, runtime, and package-availability helpers |
 | Large or slow jobs | Lazy-loaded heavy libraries, bounded concurrency helpers, output caps, and configurable timeouts |
 | Sitemap processing | Discovery through `robots.txt`, XML parsing, gzip support, nested-index expansion, diagnostics, and safety limits |
 | Portable examples | Importable n8n workflows for basic transforms, Zod validation, and sitemap discovery |
@@ -28,7 +31,9 @@ The stock n8n Code node is ideal for lightweight transforms. Code Pro is for sel
 - Node.js 22.22.0 or newer.
 - Enough disk and memory for the features you use. The package includes an FFmpeg binary and several intentionally large, lazily loaded libraries.
 - In n8n queue mode, install the package on every worker that may execute the node.
-- JavaScript only; Python is not supported.
+- JavaScript requires no additional runtime beyond n8n.
+- Python requires a native Python 3.11 or newer executable on every n8n main/worker process that can execute Code Pro. Code Pro does not install Python or run pip.
+- In n8n queue mode, install both Code Pro and the selected Python runtime on every executing worker. External n8n task runners likewise need a sidecar per worker; they do not provide an isolation boundary for this community node.
 
 Code Pro declares the n8n community-node API v1 and strict package validation. Keep n8n and Code Pro updated together, and test upgrades on a non-production instance first.
 
@@ -62,7 +67,162 @@ $env:N8N_CUSTOM_EXTENSIONS = "C:\absolute\path\to\n8n-nodes-code-pro"
 n8n start
 ```
 
-## Quick start
+## Quick start: choose your language
+
+Code Pro supports both languages in the same node. **Language** defaults to **JavaScript**, so existing workflows keep their current behavior. Select **Python** only when the executing n8n host/worker has Python 3.11+ installed.
+
+| Language | Best for | Starter pattern |
+|---|---|---|
+| JavaScript | Code Pro's injected automation libraries, existing workflows, and stock `$input`/`$json` conventions | `return $input.all().map((item) => ({ json: item.json }));` |
+| Python | Standard-library transforms, async standard-library HTTP, and Python code already available in your worker image | `return [{"json": {"count": len(_input.all())}}]` |
+
+### JavaScript
+
+```js
+return $input.all().map((item, index) => ({
+  json: { ...item.json, processed: true },
+  pairedItem: { item: index },
+}));
+```
+
+### Python
+
+```python
+return [
+    {"json": {"name": row.json.name.upper()}, "pairedItem": {"item": index}}
+    for index, row in enumerate(_input.all())
+]
+```
+
+The language-specific references below describe setup and helpers. Both paths use the same modes, output validation, item-linking hints, continue-on-fail behavior, and Max Output Items control.
+
+## Python runtime reference
+
+Select **Language -> Python** in Code Pro. Existing nodes without a `language` value keep running as JavaScript. Python is a focused native-Python MVP: it preserves Code Pro's modes, n8n item contracts, item-linking hints, continue-on-fail behavior, and Max Output Items cap without attempting to duplicate the JavaScript library catalog.
+
+### Runtime selection and deployment
+
+Code Pro requires Python 3.11 or newer and probes executables in this exact order:
+
+1. **Python Runtime -> Python Executable** (an optional per-node absolute path)
+2. `CODE_PRO_PYTHON_PATH`
+3. `python3`
+4. `python`
+5. Windows `py -3`
+
+Only a successful interpreter discovery is cached; every node execution starts a fresh Python process. If no compatible runtime is found, Code Pro fails before user code runs and reports each executable checked, the Python 3.11+ requirement, the option/environment variable, Docker guidance, and the queue-worker requirement.
+
+Add Python to the image that actually runs n8n and install the community package there. Choose the command for the base image you use:
+
+```dockerfile
+# Alpine-based n8n image
+FROM n8nio/n8n:latest
+USER root
+RUN apk add --no-cache python3
+USER node
+```
+
+```dockerfile
+# Debian/Ubuntu-based custom n8n image
+FROM your-n8n-base-image
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends python3 \
+  && rm -rf /var/lib/apt/lists/*
+USER node
+```
+
+In queue mode, **every worker that can execute Code Pro must have both this package and the chosen Python runtime**. Restart all main/worker containers after an image change. n8n's external task-runner configuration also requires a runner sidecar for every worker; use it or a separate least-privilege worker/container for untrusted Code-node workloads, not as a claim that Code Pro itself sandboxes Python.
+
+### Python authoring and return values
+
+Python code is compiled once into an async function for a node invocation, so top-level-style `return` and `await` work. In each-item mode, that compiled function is called for every input item in the same Python child process.
+
+| Python name | Meaning |
+|---|---|
+| `_input.all()` / `_input.first()` | Full input list / first input in both modes |
+| `_input.item` | Current input item in each-item mode |
+| `_json`, `_item`, `_item_index` | Current JSON, full item, and zero-based index in each-item mode |
+| `items` | Full input list in all-items mode |
+| `item` | Current full input item in each-item mode |
+| `python_utils` | Focused runtime, package, HTTP, retry, URL, and email helpers |
+
+Items support serializable attribute access such as `item.json.name` and `item.binary.attachment`; dictionary access also works. JSON `null` becomes Python `None`, and Unicode, nested dictionaries/lists, booleans, and numbers round-trip unchanged.
+
+| Mode | Python return contract |
+|---|---|
+| Run Once for All Items | Return a list of n8n items. Plain dictionaries are normalized to `{ "json": ... }` like JavaScript. |
+| Run Once for Each Item | Return one dictionary or a one-element list. Return `None` or `[]` to skip that input. More than one output item is rejected with the existing Code Pro validation error. |
+
+Use `pairedItem` when you create, remove, reorder, or aggregate output items. Python results cross back into the same Node.js normalization, validation, item-linking hint, continue-on-fail, and Max Output Items logic as JavaScript.
+
+```python
+# Run Once for All Items
+rows = _input.all()
+
+return [
+    {
+        "json": {"name": row.json.name.upper()},
+        "pairedItem": {"item": index},
+    }
+    for index, row in enumerate(rows)
+]
+```
+
+```python
+# Run Once for Each Item
+if not _json.active:
+    return None
+
+return {"json": {"name": item.json.name, "index": _item_index}}
+```
+
+### Python utilities and imports
+
+Normal standard-library imports use the selected interpreter. The MVP intentionally does not bundle Python, pandas, NumPy, `requests`, or any third-party Python package, and Code Pro never installs packages or invokes pip at workflow runtime. A third-party import may work only when it is already installed in the selected interpreter environment.
+
+| Helper | Purpose |
+|---|---|
+| `python_utils.get_runtime_info()` | Interpreter implementation, version, executable, and platform |
+| `python_utils.is_package_available(name)` | Check whether an importable package is present without importing it |
+| `await python_utils.http_get(url, ...)` | Bounded standard-library GET request |
+| `await python_utils.http_request(url, method="POST", data=..., ...)` | Bounded standard-library HTTP request |
+| `await python_utils.retry(callback, attempts=3, delay=0.2, backoff=2)` | Retries sync or async callbacks |
+| `python_utils.is_valid_url(value)` / `is_valid_email(value)` | Basic structural checks only; they are not sanitizers |
+
+`http_get()` and `http_request()` use the standard library, follow at most five redirects, use normal TLS certificate verification, set a Code Pro user agent, default to a 15-second request timeout, and retain at most 5 MiB of each response. A caller may lower `max_bytes` but cannot disable the 5 MiB ceiling. `response_type` is `"text"`, `"json"`, or `"bytes"`.
+
+```python
+response = await python_utils.http_get(
+    "https://api.example.test/status",
+    timeout=8,
+    max_bytes=256_000,
+    response_type="json",
+)
+
+return [{"json": {"status": response.status, "body": response.body}}]
+```
+
+### Serialization and limits
+
+Python return values may contain dictionaries with string keys, lists, tuples, strings, integers, finite floats, booleans, and `None`. `datetime`, `date`, and `time` become ISO strings; `Decimal` becomes a string; `bytes` and `bytearray` become `{ "__codeProType": "bytes", "base64": "..." }`; primitive-only sets become a deterministic list. Circular structures, non-finite floats, non-string dictionary keys, complex sets, and unsupported objects fail with a clear serialization error.
+
+The node exposes **Max Python Protocol Size** (default 10 MiB, 1-64 MiB) and **Max Python Log Output** (default 1 MiB, 64 KiB-4 MiB). Input JSON, the final protocol response, captured stdout/stderr, and HTTP response bodies are bounded. `print()` is captured separately from the machine-readable response, so it cannot corrupt node output. Avoid logging secrets: values that exactly match inherited environment values are redacted in surfaced Python logs and errors, but trusted code can still deliberately read or exfiltrate its host access.
+
+### Timeouts, cleanup, and troubleshooting
+
+`Timeout = 0` remains unlimited. For Python, a positive Timeout is a wall-clock **hard timeout for the entire child process and each-item batch**. Code Pro terminates the Python process tree, waits at most 1.5 seconds for graceful shutdown, then force-kills it. JavaScript keeps its existing cooperative/in-process timeout behavior; do not describe the JavaScript boundary as a hard process kill.
+
+Python process startup adds a native interpreter cold start, usually hundreds of milliseconds on a typical worker but dependent on the image, CPU, and installed environment. Code Pro compiles once per invocation and does not retain Python state or child references after success, failure, cancellation, or timeout.
+
+| Problem | Check |
+|---|---|
+| Python unavailable | Read the reported executable list; install Python 3.11+, set Python Executable or `CODE_PRO_PYTHON_PATH`, then restart the executing service. |
+| Works on main but not queue | Rebuild/restart every worker image and verify the same executable there. |
+| Missing import | Use the standard library or install the reviewed dependency into the selected interpreter during image build, never from a workflow. |
+| Protocol/log limit error | Reduce input, returned data, or prints; then raise the Python-only cap deliberately if needed. |
+| Untrusted code requirement | Move the workload to an isolated, least-privilege worker/container or use n8n's externally managed runner architecture. |
+
+## JavaScript quick start
 
 Add **Code Pro**, keep **Run Once for All Items**, and replace the editor contents with:
 

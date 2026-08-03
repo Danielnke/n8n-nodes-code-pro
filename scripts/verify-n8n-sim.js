@@ -130,6 +130,7 @@ return [{
 		'dist/nodes/CodePro/codepro.png',
 		'dist/src/libraryRegistry.js',
 		'dist/src/executeUserCode.js',
+		'dist/src/python/bootstrap.py',
 	];
 	for (const m of must) {
 		const ok = fs.existsSync(path.join(__dirname, '..', m));

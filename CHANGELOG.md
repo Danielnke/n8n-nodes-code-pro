@@ -2,6 +2,27 @@
 
 All notable changes to Code Pro are documented here.
 
+## 0.6.1 - 2026-08-03
+
+### Added
+
+- Added a backward-compatible Language selector. Existing nodes without it continue to run JavaScript.
+- Added native Python 3.11+ execution for both Code Pro modes, using one spawned process per node execution and a versioned JSON stdin/stdout protocol.
+- Added Python authoring names (`_input`, `_json`, `_item`, `_item_index`, `items`, `item`), a Python editor/template, Python helper utilities, and JavaScript-compatible output normalization/linking behavior.
+- Added deterministic interpreter discovery, optional per-node executable selection, bounded protocol/log/HTTP response handling, structured Python errors, and compiled-artifact Python regression tests.
+- Added `examples/code-pro-python-basic.json` and package build inclusion for the maintained Python bootstrap asset.
+
+### Security and operations
+
+- Python is explicitly a trusted native child process, not a sandbox. It intentionally inherits the complete n8n environment and host permissions.
+- Positive Python timeouts hard-terminate the process tree with bounded graceful and forced cleanup; JavaScript retains its existing cooperative timeout behavior.
+- Documented Docker installation, queue-worker deployment, standard-library/third-party policy, external-runner guidance, and untrusted-code isolation requirements.
+
+### Changed
+
+- Bumped the package version to 0.6.1. The n8n node API version remains 1.
+- First GitHub-tracked source release of the Python path (supersedes incomplete 0.6.0 npm snapshot alignment).
+
 ## 0.5.0 - 2026-08-02
 
 ### Security
