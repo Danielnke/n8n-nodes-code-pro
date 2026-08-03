@@ -26,6 +26,9 @@ jobs:
           node-version: 22.22.0
           cache: npm
 
+      - name: Use the lockfile npm version
+        run: npm install --global npm@11.7.0
+
       - name: Install exact dependencies
         run: npm ci
 
